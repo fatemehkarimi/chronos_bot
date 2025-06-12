@@ -3,10 +3,21 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/fatemehkarimi/chronos_bot/entities"
 	"github.com/fatemehkarimi/chronos_bot/repository"
+)
+
+type UserState int
+
+const (
+	_ UserState = iota
+	Start
+	AddFeatureFlag
+	FailedAddFeatureFlag
+	SuccessAddFeatureFlag
 )
 
 type Handler interface {
@@ -14,9 +25,10 @@ type Handler interface {
 }
 
 type HttpHandler struct {
-	db       repository.Repository
-	api      Api
-	updateId int
+	db         repository.Repository
+	api        Api
+	updateId   int
+	userStates map[string]UserState
 }
 
 func NewHttpHandler(db repository.Repository, token string) Handler {
@@ -34,6 +46,9 @@ func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+	if h.updateId >= update.UpdateId {
+		return
+	}
 
 	if update.Message != nil {
 		h.HandleMessageUpdate(update.UpdateId, update.Message)
@@ -41,19 +56,20 @@ func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Message) {
-	from := message.From
 	chat := message.Chat
-	if from.IsBot || chat.Type != "private" {
+	if chat.Type != "private" {
 		return
 	}
 
 	text := message.Text
-	if text == nil {
-		return
-	}
+	if text != nil && *text == "/start" {
+		from := message.From
+		if from.IsBot {
+			return
+		}
 
-	if *text == "/start" {
 		chatId := chat.Id
+		h.userStates[fmt.Sprintf("%d", chatId)] = Start
 		ch := make(chan entities.MethodResponse)
 
 		scheduleCallbackData := "add schedule"
@@ -75,11 +91,16 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 
 		if result.Err != nil {
 			fmt.Println("failed to send response", result.Err)
+
+			chFailed := make(chan entities.MethodResponse)
+			slog.Error("error handling /start command. err = ", slog.Int64("chatId", chatId), slog.Any("err", result.Err))
+			go h.api.SendMessage(fmt.Sprint(chatId), "خطایی رخ داده است. لطفا دوباره /start را بفرستید", nil, chFailed)
 			return
 		} else {
 			h.updateId = max(h.updateId, updatedId)
 		}
 
+		h.userStates[fmt.Sprintf("%d", chatId)] = AddFeatureFlag
 		fmt.Println(result.Response)
 	}
 }
