@@ -68,7 +68,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	httpHandler := api.NewHttpHandler(&postgresRepo)
+	httpHandler := api.NewHttpHandler(&postgresRepo, "2129549151:GWWYcJGIbB2dsiBogDXWOvctyDmdJhfCnxo7wOIy")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/getUpdates", httpHandler.GetUpdates)
 

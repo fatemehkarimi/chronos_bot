@@ -124,6 +124,35 @@ type CopyTextButton struct {
 	Text string `json:"text"`
 }
 
+type ReplyMarkup interface {
+	isReplyMarkup()
+}
+
+type KeyboardButton struct {
+	Text            string      `json:"text"`
+	RequestContact  bool        `json:"request_contact,omitempty"`
+	RequestLocation bool        `json:"request_location,omitempty"`
+	WebApp          *WebAppInfo `json:"web_app,omitempty"`
+}
+
+type ReplyKeyboardMarkup struct {
+	Keyboard []KeyboardButton `json:"keyboard"`
+}
+
+func (i ReplyKeyboardMarkup) isReplyMarkup() {}
+
+type ReplyKeyboardRemove struct {
+	RemoveKeyboard bool `json:"remove_keyboard"`
+}
+
+func (r ReplyKeyboardRemove) isReplyMarkup() {}
+
+type InlineKeyboardMarkup struct {
+	InlineKeyboard [][]InlineKeyboardButton `json:"inline_keyboard"`
+}
+
+func (i InlineKeyboardMarkup) isReplyMarkup() {}
+
 type InlineKeyboardButton struct {
 	Text         string          `json:"text"`
 	URL          *string         `json:"url,omitempty"`
@@ -131,6 +160,8 @@ type InlineKeyboardButton struct {
 	WebApp       *WebAppInfo     `json:"web_app,omitempty"`
 	CopyText     *CopyTextButton `json:"copy_text,omitempty"`
 }
+
+func (i InlineKeyboardButton) isReplyMarkup() {}
 
 type CallbackQuery struct {
 	Id      string   `json:"id"`
