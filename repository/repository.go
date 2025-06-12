@@ -15,6 +15,7 @@ type DatabaseConfig struct {
 }
 
 type Repository interface {
+	Init() error
 	CreateTableFeatureFlag() error
 	CreateTableSchedule() error
 	AddFeatureFlag(ownerId int, featureFlag string) error
@@ -90,4 +91,18 @@ func (repo *PostgresRepository) RemoveSchedule(scheduleId int) error {
 	`
 	_, err := repo.DB.Exec(query, scheduleId)
 	return err
+}
+
+func (repo *PostgresRepository) Init() error {
+	err := repo.CreateTableFeatureFlag()
+
+	if err != nil {
+		return err
+	}
+
+	err = repo.CreateTableSchedule()
+	if err != nil {
+		return err
+	}
+	return nil
 }
