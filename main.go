@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
+	"time"
 
+	"github.com/fatemehkarimi/chronos_bot/api"
 	"github.com/fatemehkarimi/chronos_bot/repository"
 	_ "github.com/lib/pq"
 	"github.com/spf13/viper"
@@ -13,28 +16,6 @@ import (
 
 type Config struct {
 	Database repository.DatabaseConfig
-}
-
-type Handler interface {
-	init() error
-}
-
-type Service struct {
-	Repo repository.Repository
-}
-
-func (s Service) init() error {
-	err := s.Repo.CreateTableFeatureFlag()
-
-	if err != nil {
-		return err
-	}
-
-	err = s.Repo.CreateTableSchedule()
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func LoadConfig() (Config, error) {
@@ -49,7 +30,6 @@ func LoadConfig() (Config, error) {
 
 	err := viper.Unmarshal(&cfg)
 	return cfg, err
-
 }
 
 func main() {
@@ -80,13 +60,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	postgersRepo := repository.PostgresRepository{DB: db}
-	service := Service{Repo: &postgersRepo}
-	err = service.init()
+	postgresRepo := repository.PostgresRepository{DB: db}
+	// err = postgresRepo.Init()
 
 	if err != nil {
 		slog.Error("failed to init service. error = ", slog.Any("err", err))
 		os.Exit(1)
 	}
 
+	httpHandler := api.NewHttpHandler(&postgresRepo, "2129549151:GWWYcJGIbB2dsiBogDXWOvctyDmdJhfCnxo7wOIy")
+	mux := http.NewServeMux()
+	mux.HandleFunc("/getUpdates", httpHandler.GetUpdates)
+
+	server := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	server.ListenAndServe()
 }
