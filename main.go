@@ -61,7 +61,7 @@ func main() {
 	}
 
 	postgresRepo := repository.PostgresRepository{DB: db}
-	// err = postgresRepo.Init()
+	err = postgresRepo.Init()
 
 	if err != nil {
 		slog.Error("failed to init service. error = ", slog.Any("err", err))
@@ -69,6 +69,7 @@ func main() {
 	}
 
 	httpHandler := api.NewHttpHandler(&postgresRepo, "2129549151:GWWYcJGIbB2dsiBogDXWOvctyDmdJhfCnxo7wOIy")
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/getUpdates", httpHandler.GetUpdates)
 

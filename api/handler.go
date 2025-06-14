@@ -8,16 +8,21 @@ import (
 
 	"github.com/fatemehkarimi/chronos_bot/entities"
 	"github.com/fatemehkarimi/chronos_bot/repository"
+	"github.com/lib/pq"
 )
 
 type UserState int
 
 const (
 	_ UserState = iota
-	Start
-	AddFeatureFlag
-	FailedAddFeatureFlag
-	SuccessAddFeatureFlag
+	StartState
+	AddFeatureFlagState
+)
+
+const (
+	AddFeatureFlagCallbackData = "add feature_flag"
+	AddScheduleCallbackData    = "add schedule"
+	ReturnCallbackData         = "return"
 )
 
 type Handler interface {
@@ -53,6 +58,10 @@ func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
 	if update.Message != nil {
 		h.HandleMessageUpdate(update.UpdateId, update.Message)
 	}
+
+	if update.CallbackQuery != nil {
+		h.HandleCallbackQueryUpdate(update.UpdateId, update.CallbackQuery)
+	}
 }
 
 func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Message) {
@@ -61,6 +70,7 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 		return
 	}
 
+	chatId := chat.Id
 	text := message.Text
 	if text != nil && *text == "/start" {
 		from := message.From
@@ -68,12 +78,11 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 			return
 		}
 
-		chatId := chat.Id
-		h.userStates[fmt.Sprintf("%d", chatId)] = Start
+		h.userStates[fmt.Sprintf("%d", chatId)] = StartState
 		ch := make(chan entities.MethodResponse)
 
-		scheduleCallbackData := "add schedule"
-		featureFlagCallbackData := "add feature_flag"
+		scheduleCallbackData := AddScheduleCallbackData
+		featureFlagCallbackData := AddFeatureFlagCallbackData
 		replyMarkup := entities.InlineKeyboardMarkup{
 			InlineKeyboard: [][]entities.InlineKeyboardButton{
 				{
@@ -100,7 +109,88 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 			h.updateId = max(h.updateId, updatedId)
 		}
 
-		h.userStates[fmt.Sprintf("%d", chatId)] = AddFeatureFlag
 		fmt.Println(result.Response)
 	}
+
+	userState := h.userStates[fmt.Sprint(chatId)]
+	switch userState {
+	case AddFeatureFlagState:
+		h.AddFeatureFlag(updatedId, chatId, message)
+		return
+	}
+}
+
+func (h *HttpHandler) HandleCallbackQueryUpdate(updateId int, callbackQuery *entities.CallbackQuery) {
+	data := callbackQuery.Data
+	switch *data {
+	case AddFeatureFlagCallbackData:
+		h.HandleAddFeatureFlagCallbackData(updateId, callbackQuery.From.Id)
+	}
+
+}
+
+func (h *HttpHandler) HandleAddFeatureFlagCallbackData(updateId, chatId int) {
+	ch := make(chan entities.MethodResponse)
+	go h.api.SendMessage(fmt.Sprint(chatId), "نام پرچم را بنویسید.(feature flag)", nil, ch)
+
+	result := <-ch
+	if result.Err != nil {
+		slog.Error("error handling /start command. err = ", slog.Int("chatId", chatId), slog.Any("err", result.Err))
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	} else {
+		h.updateId = max(h.updateId, updateId)
+		h.userStates[fmt.Sprint(chatId)] = AddFeatureFlagState
+	}
+}
+
+func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entities.Message) {
+	value := *message.Text
+
+	if value != "" {
+		// because chatId is private, casting is fine
+		err := h.db.AddFeatureFlag(int(chatId), value)
+		if pgErr, ok := err.(*pq.Error); ok {
+			if pgErr.Code == "23505" && pgErr.Constraint == "feature_flag_pkey" {
+				slog.Error("Duplicate key error on feature_flag_pkey",
+					slog.Int("updateId", updateId),
+					slog.Int64("chatId", chatId),
+					slog.String("value", value),
+				)
+
+				scheduleCallbackData := AddScheduleCallbackData
+				featureFlagCallbackData := AddFeatureFlagCallbackData
+				replyMarkup := entities.InlineKeyboardMarkup{
+					InlineKeyboard: [][]entities.InlineKeyboardButton{
+						{
+							entities.InlineKeyboardButton{Text: "افزودن پرچم", CallbackData: &featureFlagCallbackData},
+						},
+						{
+							entities.InlineKeyboardButton{Text: "افزودن برنامه زمانی", CallbackData: &scheduleCallbackData},
+						},
+					},
+				}
+
+				chMessage := make(chan entities.MethodResponse)
+				go h.api.SendMessage(fmt.Sprint(chatId), "این پرچم قبلا به نام شما ثبت شده است.", replyMarkup, chMessage)
+
+				result := <-chMessage
+				if result.Err != nil {
+					slog.Error("faild to notify user for duplicate response",
+						slog.Int("updateId", updateId),
+						slog.Int64("chatId", chatId),
+						slog.String("value", value),
+					)
+					h.userStates[fmt.Sprint(chatId)] = StartState
+				}
+				return
+			}
+		}
+	}
+}
+
+func (h *HttpHandler) ResetUserStateAndSendResetMessage(chatId int) {
+	chFailed := make(chan entities.MethodResponse)
+	go h.api.SendMessage(fmt.Sprint(chatId), "خطایی رخ داده است. لطفا دوباره /start را بفرستید", nil, chFailed)
+	h.userStates[fmt.Sprint(chatId)] = StartState
 }
