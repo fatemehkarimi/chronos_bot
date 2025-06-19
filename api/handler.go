@@ -39,7 +39,7 @@ type HttpHandler struct {
 
 func NewHttpHandler(db repository.Repository, token string) Handler {
 	api := BaleApi{token: token}
-	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 28}
+	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 31}
 }
 
 func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
@@ -64,6 +64,8 @@ func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
 	if update.CallbackQuery != nil {
 		h.HandleCallbackQueryUpdate(update.UpdateId, update.CallbackQuery)
 	}
+
+	h.updateId = max(h.updateId, update.UpdateId)
 }
 
 func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Message) {
@@ -108,7 +110,6 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 			go h.api.SendMessage(fmt.Sprint(chatId), "خطایی رخ داده است. لطفا دوباره /start را بفرستید", nil, chFailed)
 			return
 		} else {
-			h.updateId = max(h.updateId, updatedId)
 		}
 
 		fmt.Println(result.Response)
@@ -129,7 +130,6 @@ func (h *HttpHandler) HandleCallbackQueryUpdate(updateId int, callbackQuery *ent
 		h.HandleAddFeatureFlagCallbackData(updateId, callbackQuery.From.Id)
 	default:
 		slog.Info("unknown callback query data", data)
-		h.updateId = max(h.updateId, updateId)
 		return
 	}
 
@@ -145,7 +145,6 @@ func (h *HttpHandler) HandleAddFeatureFlagCallbackData(updateId, chatId int) {
 		h.ResetUserStateAndSendResetMessage(chatId)
 		return
 	} else {
-		h.updateId = max(h.updateId, updateId)
 		h.userStates[fmt.Sprint(chatId)] = AddFeatureFlagState
 	}
 }
