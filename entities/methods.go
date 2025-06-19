@@ -15,3 +15,11 @@ type RequestSendMessage struct {
 }
 
 type ResponseSendMessage = Message
+
+type RequestGetUpdates struct {
+}
+
+type ResponseGetUpdates struct {
+	Ok     bool     `json:"ok"`
+	Result []Update `json:"result"`
+}

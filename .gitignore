@@ -2,3 +2,4 @@
 *.crswap
 
 build/
+.idea/

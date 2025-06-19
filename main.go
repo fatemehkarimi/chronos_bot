@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fatemehkarimi/chronos_bot/api"
+	"github.com/fatemehkarimi/chronos_bot/entities"
 	"github.com/fatemehkarimi/chronos_bot/repository"
 	_ "github.com/lib/pq"
 	"github.com/spf13/viper"
@@ -31,6 +34,8 @@ func LoadConfig() (Config, error) {
 	err := viper.Unmarshal(&cfg)
 	return cfg, err
 }
+
+var botToken = "2129549151:GWWYcJGIbB2dsiBogDXWOvctyDmdJhfCnxo7wOIy"
 
 func main() {
 	config, err := LoadConfig()
@@ -68,7 +73,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	httpHandler := api.NewHttpHandler(&postgresRepo, "2129549151:GWWYcJGIbB2dsiBogDXWOvctyDmdJhfCnxo7wOIy")
+	httpHandler := api.NewHttpHandler(&postgresRepo, botToken)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/getUpdates", httpHandler.GetUpdates)
@@ -81,5 +86,80 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
+	go checkForUpdates(botToken, httpHandler)
 	server.ListenAndServe()
+
+}
+
+func checkForUpdates(botToken string, handler api.Handler) {
+	client := &http.Client{}
+	for {
+		time.Sleep(3 * time.Second)
+		requestStruct := entities.RequestGetUpdates{}
+		requestBytes, err := json.MarshalIndent(requestStruct, "", "  ")
+
+		if err != nil {
+			slog.Error("error marshaling request", slog.Any("error", err))
+		}
+
+		lastUpdateId := handler.GetLastProcesedUpdateId() + 1
+		slog.Info("fetching updates from ", slog.Int("updateId", lastUpdateId))
+		limit := 1
+		timeout := 1
+		endpoint := fmt.Sprintf(
+			"https://tapi.bale.ai/bot%s/getUpdates?offset=%d&limit=%d&timeout=%d",
+			botToken,
+			lastUpdateId,
+			limit,
+			timeout,
+		)
+
+		req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestBytes))
+
+		if err != nil {
+			slog.Error("error creating new request", slog.Any("error", err))
+			continue
+		}
+
+		res, err := client.Do(req)
+
+		if err != nil {
+			slog.Error("error creating sending request", slog.Any("error", err))
+			continue
+		}
+		slog.Info("getUpdates response from tapi", slog.Int("status", res.StatusCode))
+
+		updateResponse := entities.ResponseGetUpdates{}
+		err = json.NewDecoder(res.Body).Decode(&updateResponse)
+		if err != nil {
+			slog.Error("error parsing response", slog.Any("error", err))
+			continue
+		}
+
+		// sending updates
+		for _, update := range updateResponse.Result {
+			requestBytes, err := json.MarshalIndent(update, "", "  ")
+
+			if err != nil {
+				slog.Error("error marshaling request", slog.Any("error", err))
+			}
+
+			req, err := http.NewRequest("POST", "http://localhost:8080/getUpdates", bytes.NewBuffer(requestBytes))
+
+			if err != nil {
+				slog.Error("error creating new request", slog.Any("error", err))
+				continue
+			}
+
+			res, err := client.Do(req)
+
+			if err != nil {
+				slog.Error("error creating sending request", slog.Any("error", err))
+				continue
+			}
+
+			slog.Info("getUpdates response", slog.Int("status", res.StatusCode))
+
+		}
+	}
 }

@@ -27,6 +27,7 @@ const (
 
 type Handler interface {
 	GetUpdates(w http.ResponseWriter, r *http.Request)
+	GetLastProcesedUpdateId() int
 }
 
 type HttpHandler struct {
@@ -38,7 +39,7 @@ type HttpHandler struct {
 
 func NewHttpHandler(db repository.Repository, token string) Handler {
 	api := BaleApi{token: token}
-	return &HttpHandler{db: db, api: api}
+	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 28}
 }
 
 func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +48,7 @@ func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		w.WriteHeader(http.StatusNotAcceptable)
+		slog.Error("error parsing update", slog.Any("error", err))
 		return
 	}
 
@@ -125,6 +127,10 @@ func (h *HttpHandler) HandleCallbackQueryUpdate(updateId int, callbackQuery *ent
 	switch *data {
 	case AddFeatureFlagCallbackData:
 		h.HandleAddFeatureFlagCallbackData(updateId, callbackQuery.From.Id)
+	default:
+		slog.Info("unknown callback query data", data)
+		h.updateId = max(h.updateId, updateId)
+		return
 	}
 
 }
@@ -193,4 +199,8 @@ func (h *HttpHandler) ResetUserStateAndSendResetMessage(chatId int) {
 	chFailed := make(chan entities.MethodResponse)
 	go h.api.SendMessage(fmt.Sprint(chatId), "خطایی رخ داده است. لطفا دوباره /start را بفرستید", nil, chFailed)
 	h.userStates[fmt.Sprint(chatId)] = StartState
+}
+
+func (h *HttpHandler) GetLastProcesedUpdateId() int {
+	return h.updateId
 }
