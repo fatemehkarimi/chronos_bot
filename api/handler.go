@@ -12,12 +12,35 @@ import (
 	"github.com/lib/pq"
 )
 
-type UserState int
+type UserState struct {
+	StateName State
+
+	// for schedule state
+	SelectedFeatureFlag  *entities.FeatureFlag
+	SelectedCalendarType *Calendar
+}
+
+type Calendar int
 
 const (
-	_ UserState = iota
+	_ Calendar = iota
+	KhorshidiCalendar
+	GeorgianCalendar
+	QamariCalendar
+)
+
+type State int
+
+const (
+	_ State = iota
 	StartState
+
+	// add feature flag
 	AddFeatureFlagState
+
+	// add schedule
+	ChooseFeatureFlagState
+	ChooseCalendarTypeState
 )
 
 type Handler interface {
@@ -34,7 +57,7 @@ type HttpHandler struct {
 
 func NewHttpHandler(db repository.Repository, token string) Handler {
 	api := BaleApi{token: token}
-	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 73}
+	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 57}
 }
 
 func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +100,7 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 			return
 		}
 
-		h.userStates[fmt.Sprintf("%d", chatId)] = StartState
+		h.userStates[fmt.Sprintf("%d", chatId)] = UserState{StateName: StartState}
 		ch := make(chan entities.MethodResponse)
 
 		replyMarkup := utils.GetMainReplyMarkup()
@@ -99,10 +122,12 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 	}
 
 	userState := h.userStates[fmt.Sprint(chatId)]
-	switch userState {
+	switch userState.StateName {
 	case AddFeatureFlagState:
 		h.AddFeatureFlag(updatedId, chatId, message)
 		return
+	default:
+		panic("unhandled default case")
 	}
 }
 
@@ -111,6 +136,8 @@ func (h *HttpHandler) HandleCallbackQueryUpdate(updateId int, callbackQuery *ent
 	switch *data {
 	case utils.AddFeatureFlagCallbackData:
 		h.HandleAddFeatureFlagCallbackData(updateId, callbackQuery.From.Id)
+	case utils.AddScheduleCallbackData:
+		h.HandleAddScheduleCallbackData(updateId, callbackQuery.From.Id)
 	default:
 		slog.Info("unknown callback query data", data)
 		return
@@ -127,8 +154,23 @@ func (h *HttpHandler) HandleAddFeatureFlagCallbackData(updateId, chatId int) {
 		h.ResetUserStateAndSendResetMessage(chatId)
 		return
 	} else {
-		h.userStates[fmt.Sprint(chatId)] = AddFeatureFlagState
+		h.userStates[fmt.Sprint(chatId)] = UserState{StateName: AddFeatureFlagState}
 	}
+}
+
+func (h *HttpHandler) HandleAddScheduleCallbackData(updateId int, chatId int) {
+	ch := make(chan entities.MethodResponse)
+	replyMarkup := utils.GetScheduleReplyMarkup()
+	go h.api.SendMessage(fmt.Sprint(chatId), "تقویم برنامه زمانی را انتخاب کنید", replyMarkup, ch)
+	result := <-ch
+	if result.Err != nil {
+		slog.Error("error send choose calendar message. err = ", slog.Int("chatId", chatId), slog.Any("err", result.Err))
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	} else {
+		h.userStates[fmt.Sprint(chatId)] = UserState{StateName: ChooseFeatureFlagState}
+	}
+
 }
 
 func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entities.Message) {
@@ -166,7 +208,7 @@ func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entiti
 							slog.Int64("chatId", chatId),
 							slog.String("value", value),
 						)
-						h.userStates[fmt.Sprint(chatId)] = StartState
+						h.userStates[fmt.Sprint(chatId)] = UserState{StateName: StartState}
 					}
 					return
 				}
@@ -181,7 +223,7 @@ func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entiti
 						slog.String("value", value),
 						slog.Any("error", result.Err),
 					)
-					h.userStates[fmt.Sprint(chatId)] = StartState
+					h.userStates[fmt.Sprint(chatId)] = UserState{StateName: StartState}
 				}
 			}
 		} else {
@@ -200,7 +242,7 @@ func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entiti
 					slog.String("value", value),
 					slog.Any("error", result.Err),
 				)
-				h.userStates[fmt.Sprint(chatId)] = StartState
+				h.userStates[fmt.Sprint(chatId)] = UserState{StateName: StartState}
 			}
 		}
 	}
@@ -209,7 +251,7 @@ func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entiti
 func (h *HttpHandler) ResetUserStateAndSendResetMessage(chatId int) {
 	chFailed := make(chan entities.MethodResponse)
 	go h.api.SendMessage(fmt.Sprint(chatId), "خطایی رخ داده است. لطفا دوباره /start را بفرستید", nil, chFailed)
-	h.userStates[fmt.Sprint(chatId)] = StartState
+	h.userStates[fmt.Sprint(chatId)] = UserState{StateName: StartState}
 }
 
 func (h *HttpHandler) GetLastProcessedUpdateId() int {

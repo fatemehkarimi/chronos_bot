@@ -5,7 +5,10 @@ import "github.com/fatemehkarimi/chronos_bot/entities"
 const (
 	AddFeatureFlagCallbackData = "add feature_flag"
 	AddScheduleCallbackData    = "add schedule"
-	ReturnCallbackData         = "return"
+
+	KhorshidiCalendarCallbackData = "khorshidi calendar"
+	GeorgianCalendarCallbackData  = "georgian calendar"
+	QamariCalendarCallbackData    = "qamari calendar"
 )
 
 func GetMainReplyMarkup() entities.ReplyMarkup {
@@ -21,5 +24,27 @@ func GetMainReplyMarkup() entities.ReplyMarkup {
 			},
 		},
 	}
+	return replyMarkup
+}
+
+func GetScheduleReplyMarkup() entities.ReplyMarkup {
+	khorshidiCalendarCallbackData := KhorshidiCalendarCallbackData
+	georgianCalendarCallbackData := GeorgianCalendarCallbackData
+	qamariCalendarCallbackData := QamariCalendarCallbackData
+
+	replyMarkup := entities.InlineKeyboardMarkup{
+		InlineKeyboard: [][]entities.InlineKeyboardButton{
+			{
+				entities.InlineKeyboardButton{Text: "خورشیدی", CallbackData: &khorshidiCalendarCallbackData},
+			},
+			{
+				entities.InlineKeyboardButton{Text: "میلادی", CallbackData: &georgianCalendarCallbackData},
+			},
+			{
+				entities.InlineKeyboardButton{Text: "قمری", CallbackData: &qamariCalendarCallbackData},
+			},
+		},
+	}
+
 	return replyMarkup
 }
