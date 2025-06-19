@@ -2,6 +2,8 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
+	"github.com/fatemehkarimi/chronos_bot/entities"
 	"time"
 )
 
@@ -21,6 +23,7 @@ type Repository interface {
 	AddFeatureFlag(ownerId int, featureFlag string) error
 	AddSchedule(featureFlag, value string, calendarType CalendarType, year, month, day, hour, minute int) (int, error)
 	RemoveSchedule(scheduleId int) error
+	GetFeatureFlagByName(name string) (*entities.FeatureFlag, error)
 }
 
 type PostgresRepository struct {
@@ -91,6 +94,23 @@ func (repo *PostgresRepository) RemoveSchedule(scheduleId int) error {
 	`
 	_, err := repo.DB.Exec(query, scheduleId)
 	return err
+}
+
+func (repo *PostgresRepository) GetFeatureFlagByName(name string) (*entities.FeatureFlag, error) {
+	query := `
+	SELECT feature_flag, owner_id, unix_time FROM feature_flag WHERE feature_flag=$1;
+	`
+
+	var featureFlag entities.FeatureFlag
+	err := repo.DB.QueryRow(query, name).Scan(&featureFlag.Name, &featureFlag.OwnerId, &featureFlag.UnixTime)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+	}
+
+	return &featureFlag, nil
 }
 
 func (repo *PostgresRepository) Init() error {

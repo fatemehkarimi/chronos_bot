@@ -102,7 +102,7 @@ func checkForUpdates(botToken string, handler api.Handler) {
 			slog.Error("error marshaling request", slog.Any("error", err))
 		}
 
-		lastUpdateId := handler.GetLastProcesedUpdateId() + 1
+		lastUpdateId := handler.GetLastProcessedUpdateId() + 1
 		slog.Info("fetching updates from ", slog.Int("updateId", lastUpdateId))
 		limit := 1
 		timeout := 1

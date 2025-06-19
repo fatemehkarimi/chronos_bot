@@ -22,7 +22,7 @@ const (
 
 type Handler interface {
 	GetUpdates(w http.ResponseWriter, r *http.Request)
-	GetLastProcesedUpdateId() int
+	GetLastProcessedUpdateId() int
 }
 
 type HttpHandler struct {
@@ -34,7 +34,7 @@ type HttpHandler struct {
 
 func NewHttpHandler(db repository.Repository, token string) Handler {
 	api := BaleApi{token: token}
-	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 41}
+	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 73}
 }
 
 func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
@@ -148,7 +148,16 @@ func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entiti
 						slog.String("value", value),
 					)
 
-					go h.api.SendMessage(fmt.Sprint(chatId), "این پرچم قبلا به نام شما ثبت شده است.", replyMarkup, chMessage)
+					featureFlag, err := h.db.GetFeatureFlagByName(value)
+					if err != nil {
+						slog.Error("error getting feature flag", slog.Any("error", err))
+					}
+
+					text := "این پرچم به نام کاربر دیگری ثبت شده است."
+					if featureFlag.OwnerId == int(chatId) {
+						text = "این پرچم قبلا به نام شما ثبت شده است."
+					}
+					go h.api.SendMessage(fmt.Sprint(chatId), text, replyMarkup, chMessage)
 
 					result := <-chMessage
 					if result.Err != nil {
@@ -185,7 +194,7 @@ func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entiti
 
 			result := <-chMessage
 			if result.Err != nil {
-				slog.Error("unknown error occured adding new feature flag",
+				slog.Error("unknown error occurred adding new feature flag",
 					slog.Int("updateId", updateId),
 					slog.Int64("chatId", chatId),
 					slog.String("value", value),
@@ -203,6 +212,6 @@ func (h *HttpHandler) ResetUserStateAndSendResetMessage(chatId int) {
 	h.userStates[fmt.Sprint(chatId)] = StartState
 }
 
-func (h *HttpHandler) GetLastProcesedUpdateId() int {
+func (h *HttpHandler) GetLastProcessedUpdateId() int {
 	return h.updateId
 }
