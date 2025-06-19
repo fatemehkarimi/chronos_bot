@@ -94,7 +94,7 @@ func main() {
 func checkForUpdates(botToken string, handler api.Handler) {
 	client := &http.Client{}
 	for {
-		time.Sleep(3 * time.Second)
+		time.Sleep(5 * time.Second)
 		requestStruct := entities.RequestGetUpdates{}
 		requestBytes, err := json.MarshalIndent(requestStruct, "", "  ")
 

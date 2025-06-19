@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
 	"log/slog"
 	"net/http"
 
@@ -19,12 +20,6 @@ const (
 	AddFeatureFlagState
 )
 
-const (
-	AddFeatureFlagCallbackData = "add feature_flag"
-	AddScheduleCallbackData    = "add schedule"
-	ReturnCallbackData         = "return"
-)
-
 type Handler interface {
 	GetUpdates(w http.ResponseWriter, r *http.Request)
 	GetLastProcesedUpdateId() int
@@ -39,7 +34,7 @@ type HttpHandler struct {
 
 func NewHttpHandler(db repository.Repository, token string) Handler {
 	api := BaleApi{token: token}
-	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 31}
+	return &HttpHandler{db: db, api: api, userStates: map[string]UserState{}, updateId: 41}
 }
 
 func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
@@ -85,20 +80,8 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 		h.userStates[fmt.Sprintf("%d", chatId)] = StartState
 		ch := make(chan entities.MethodResponse)
 
-		scheduleCallbackData := AddScheduleCallbackData
-		featureFlagCallbackData := AddFeatureFlagCallbackData
-		replyMarkup := entities.InlineKeyboardMarkup{
-			InlineKeyboard: [][]entities.InlineKeyboardButton{
-				{
-					entities.InlineKeyboardButton{Text: "افزودن پرچم", CallbackData: &featureFlagCallbackData},
-				},
-				{
-					entities.InlineKeyboardButton{Text: "افزودن برنامه زمانی", CallbackData: &scheduleCallbackData},
-				},
-			},
-		}
-
-		go h.api.SendMessage(fmt.Sprint(chatId), "سلام!\nچه کاری را می خواهید به من بسپارید؟", &replyMarkup, ch)
+		replyMarkup := utils.GetMainReplyMarkup()
+		go h.api.SendMessage(fmt.Sprint(chatId), "سلام!\nچه کاری را می خواهید به من بسپارید؟", replyMarkup, ch)
 
 		result := <-ch
 
@@ -126,18 +109,17 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 func (h *HttpHandler) HandleCallbackQueryUpdate(updateId int, callbackQuery *entities.CallbackQuery) {
 	data := callbackQuery.Data
 	switch *data {
-	case AddFeatureFlagCallbackData:
+	case utils.AddFeatureFlagCallbackData:
 		h.HandleAddFeatureFlagCallbackData(updateId, callbackQuery.From.Id)
 	default:
 		slog.Info("unknown callback query data", data)
 		return
 	}
-
 }
 
 func (h *HttpHandler) HandleAddFeatureFlagCallbackData(updateId, chatId int) {
 	ch := make(chan entities.MethodResponse)
-	go h.api.SendMessage(fmt.Sprint(chatId), "نام پرچم را بنویسید.(feature flag)", nil, ch)
+	go h.api.SendMessage(fmt.Sprint(chatId), "نام پرچم(feature flag) را بنویسید.", nil, ch)
 
 	result := <-ch
 	if result.Err != nil {
@@ -155,40 +137,61 @@ func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entiti
 	if value != "" {
 		// because chatId is private, casting is fine
 		err := h.db.AddFeatureFlag(int(chatId), value)
-		if pgErr, ok := err.(*pq.Error); ok {
-			if pgErr.Code == "23505" && pgErr.Constraint == "feature_flag_pkey" {
-				slog.Error("Duplicate key error on feature_flag_pkey",
-					slog.Int("updateId", updateId),
-					slog.Int64("chatId", chatId),
-					slog.String("value", value),
-				)
-
-				scheduleCallbackData := AddScheduleCallbackData
-				featureFlagCallbackData := AddFeatureFlagCallbackData
-				replyMarkup := entities.InlineKeyboardMarkup{
-					InlineKeyboard: [][]entities.InlineKeyboardButton{
-						{
-							entities.InlineKeyboardButton{Text: "افزودن پرچم", CallbackData: &featureFlagCallbackData},
-						},
-						{
-							entities.InlineKeyboardButton{Text: "افزودن برنامه زمانی", CallbackData: &scheduleCallbackData},
-						},
-					},
-				}
-
-				chMessage := make(chan entities.MethodResponse)
-				go h.api.SendMessage(fmt.Sprint(chatId), "این پرچم قبلا به نام شما ثبت شده است.", replyMarkup, chMessage)
-
-				result := <-chMessage
-				if result.Err != nil {
-					slog.Error("faild to notify user for duplicate response",
+		chMessage := make(chan entities.MethodResponse)
+		if err != nil {
+			replyMarkup := utils.GetMainReplyMarkup()
+			if pgErr, ok := err.(*pq.Error); ok {
+				if pgErr.Code == "23505" && pgErr.Constraint == "feature_flag_pkey" {
+					slog.Error("Duplicate key error on feature_flag_pkey",
 						slog.Int("updateId", updateId),
 						slog.Int64("chatId", chatId),
 						slog.String("value", value),
 					)
+
+					go h.api.SendMessage(fmt.Sprint(chatId), "این پرچم قبلا به نام شما ثبت شده است.", replyMarkup, chMessage)
+
+					result := <-chMessage
+					if result.Err != nil {
+						slog.Error("faild to notify user for duplicate response",
+							slog.Int("updateId", updateId),
+							slog.Int64("chatId", chatId),
+							slog.String("value", value),
+						)
+						h.userStates[fmt.Sprint(chatId)] = StartState
+					}
+					return
+				}
+			} else {
+				go h.api.SendMessage(fmt.Sprint(chatId), "خطای نامشخص در افزودن پرچم رخ داده است. این موضوع را با توسعه دهنده در میان بگذارید.", replyMarkup, chMessage)
+
+				result := <-chMessage
+				if result.Err != nil {
+					slog.Error("unknown error occured adding new feature flag",
+						slog.Int("updateId", updateId),
+						slog.Int64("chatId", chatId),
+						slog.String("value", value),
+						slog.Any("error", result.Err),
+					)
 					h.userStates[fmt.Sprint(chatId)] = StartState
 				}
-				return
+			}
+		} else {
+			go h.api.SendMessage(
+				fmt.Sprint(chatId),
+				"پرچم شما ثبت شد. اکنون می‌توانید برنامه زمانی برای آن تعریف کنید.",
+				utils.GetMainReplyMarkup(),
+				chMessage,
+			)
+
+			result := <-chMessage
+			if result.Err != nil {
+				slog.Error("unknown error occured adding new feature flag",
+					slog.Int("updateId", updateId),
+					slog.Int64("chatId", chatId),
+					slog.String("value", value),
+					slog.Any("error", result.Err),
+				)
+				h.userStates[fmt.Sprint(chatId)] = StartState
 			}
 		}
 	}
