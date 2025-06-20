@@ -6,6 +6,7 @@ import (
 	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/fatemehkarimi/chronos_bot/entities"
 	"github.com/fatemehkarimi/chronos_bot/repository"
@@ -27,6 +28,10 @@ type HttpHandler struct {
 func NewHttpHandler(db repository.Repository, token string) Handler {
 	api := BaleApi{token: token}
 	return &HttpHandler{db: db, api: api, userStates: map[string]entities.UserState{}, updateId: 57}
+}
+
+func (h *HttpHandler) GetLastProcessedUpdateId() int {
+	return h.updateId
 }
 
 func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
@@ -103,15 +108,29 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 
 func (h *HttpHandler) HandleCallbackQueryUpdate(updateId int, callbackQuery *entities.CallbackQuery) {
 	data := callbackQuery.Data
-	switch *data {
-	case utils.AddFeatureFlagCallbackData:
+	fmt.Println(
+		"here callback data = ",
+		*data == utils.KhorshidiCalendarCallbackData,
+		*data == utils.GeorgianCalendarCallbackData,
+		*data == utils.QamariCalendarCallbackData,
+	)
+	switch {
+	case *data == utils.AddFeatureFlagCallbackData:
 		h.HandleAddFeatureFlagCallbackData(updateId, callbackQuery.From.Id)
-	case utils.AddScheduleCallbackData:
+		break
+	case *data == utils.AddScheduleCallbackData:
 		h.HandleAddScheduleCallbackData(updateId, callbackQuery.From.Id)
-	case utils.KhorshidiCalendarCallbackData:
-	case utils.GeorgianCalendarCallbackData:
-	case utils.QamariCalendarCallbackData:
+		break
+	case *data == utils.KhorshidiCalendarCallbackData:
 		h.HandleCalendarTypeCallbackData(updateId, callbackQuery.From.Id, utils.CallbackDataToCalendarType(*data))
+	case *data == utils.GeorgianCalendarCallbackData:
+		h.HandleCalendarTypeCallbackData(updateId, callbackQuery.From.Id, utils.CallbackDataToCalendarType(*data))
+	case *data == utils.QamariCalendarCallbackData:
+		h.HandleCalendarTypeCallbackData(updateId, callbackQuery.From.Id, utils.CallbackDataToCalendarType(*data))
+		break
+	case strings.HasPrefix(*data, "feature_flag"):
+		h.HandleChooseFeatureFlag(updateId, callbackQuery.From.Id, *data)
+		break
 	default:
 		slog.Info("unknown callback query data", data)
 		return
@@ -133,19 +152,7 @@ func (h *HttpHandler) HandleAddFeatureFlagCallbackData(updateId, chatId int) {
 }
 
 func (h *HttpHandler) HandleAddScheduleCallbackData(updateId int, chatId int) {
-	//ch := make(chan entities.MethodResponse)
-	//replyMarkup := utils.GetScheduleReplyMarkup()
-	//go h.api.SendMessage(fmt.Sprint(chatId), "تقویم برنامه زمانی را انتخاب کنید", replyMarkup, ch)
-	//result := <-ch
-	//if result.Err != nil {
-	//	slog.Error("error send choose calendar message. err = ", slog.Int("chatId", chatId), slog.Any("err", result.Err))
-	//	h.ResetUserStateAndSendResetMessage(chatId)
-	//	return
-	//} else {
-	//	h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.ChooseFeatureFlagState}
-	//}
-
-	h.HandleChooseFeatureFlag(updateId, chatId)
+	h.HandleSendUserFeatureFlags(updateId, chatId)
 }
 
 func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entities.Message) {
@@ -211,7 +218,7 @@ func (h *HttpHandler) AddFeatureFlag(updateId int, chatId int64, message *entiti
 	}
 }
 
-func (h *HttpHandler) HandleChooseFeatureFlag(updateId, chatId int) {
+func (h *HttpHandler) HandleSendUserFeatureFlags(updateId, chatId int) {
 	featureFlags, err := h.db.GetFeatureFlagsByOwnerId(chatId)
 	if err != nil {
 		slog.Error("error getting feature flags", slog.Any("error", err))
@@ -240,6 +247,7 @@ func (h *HttpHandler) HandleChooseFeatureFlag(updateId, chatId int) {
 
 func (h *HttpHandler) HandleCalendarTypeCallbackData(updateId, chatId int, calendarType entities.Calendar) {
 	userState := h.userStates[fmt.Sprint(chatId)]
+	fmt.Println("here handle calendar type callback data = ", userState.StateName)
 	if userState.StateName != entities.ChooseCalendarTypeState {
 		slog.Error("user cannot set calendar type in this state", slog.Int("updateId", updateId), slog.Int("chatId", chatId), slog.Any("state", userState.StateName))
 		h.ResetUserStateAndSendResetMessage(chatId)
@@ -248,6 +256,28 @@ func (h *HttpHandler) HandleCalendarTypeCallbackData(updateId, chatId int, calen
 
 	userState.SelectedCalendarType = &calendarType
 
+	userState.StateName = entities.GetScheduleState
+	chMessage := make(chan entities.MethodResponse)
+
+	fmt.Println("here")
+	go h.api.SendMessage(
+		fmt.Sprint(chatId),
+		`برنامه زمانی پرچم را با الگوی زیر بفرستید. برای پارامترهای روز(d)، ساعت(hh) و دقیقه(mm) باید مقداری تعیین شود اما پارامترهای دیگر می‌توانند خالی باشند. اگر به راهنمایی بیشتر نیاز دارید، /help را بفرستید
+y: ***
+m: ***
+d: 20
+hh: 0
+mm: 30
+`,
+		nil,
+		chMessage)
+
+	result := <-chMessage
+	if result.Err != nil {
+		slog.Error("error send schedule message to user", slog.Int("chatId", chatId))
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	}
 }
 
 func (h *HttpHandler) ResetUserStateAndSendResetMessage(chatId int) {
@@ -272,6 +302,33 @@ func (h *HttpHandler) SendContactDeveloperErrorMessage(updateId, chatId int) {
 	}
 }
 
-func (h *HttpHandler) GetLastProcessedUpdateId() int {
-	return h.updateId
+func (h *HttpHandler) HandleChooseFeatureFlag(updateId, chatId int, featureFlagCallbackData string) {
+	featureFlagName := strings.TrimPrefix(featureFlagCallbackData, "feature_flag ")
+	userState := h.userStates[fmt.Sprint(chatId)]
+
+	if userState.StateName != entities.ChooseFeatureFlagState {
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	}
+
+	userState.SelectedFeatureFlag = &entities.FeatureFlag{Name: featureFlagName, OwnerId: chatId}
+	h.HandleSendCalendarType(updateId, chatId)
+}
+
+func (h *HttpHandler) HandleSendCalendarType(updateId, chatId int) {
+	ch := make(chan entities.MethodResponse)
+	replyMarkup := utils.GetScheduleReplyMarkup()
+	go h.api.SendMessage(fmt.Sprint(chatId), "تقویم برنامه زمانی را انتخاب کنید", replyMarkup, ch)
+	result := <-ch
+	if result.Err != nil {
+		slog.Error("error send choose calendar message. err = ", slog.Int("chatId", chatId), slog.Any("err", result.Err))
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	} else {
+		prevUserState := h.userStates[fmt.Sprint(chatId)]
+		h.userStates[fmt.Sprint(chatId)] = entities.UserState{
+			StateName:           entities.ChooseCalendarTypeState,
+			SelectedFeatureFlag: prevUserState.SelectedFeatureFlag,
+		}
+	}
 }

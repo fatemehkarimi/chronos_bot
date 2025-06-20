@@ -18,6 +18,7 @@ const (
 	// add schedule
 	ChooseFeatureFlagState
 	ChooseCalendarTypeState
+	GetScheduleState
 )
 
 type UserState struct {
