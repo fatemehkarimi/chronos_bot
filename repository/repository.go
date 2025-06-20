@@ -21,22 +21,15 @@ type Repository interface {
 	CreateTableFeatureFlag() error
 	CreateTableSchedule() error
 	AddFeatureFlag(ownerId int, featureFlag string) error
-	AddSchedule(featureFlag, value string, calendarType CalendarType, year, month, day, hour, minute int) (int, error)
+	AddSchedule(featureFlag, value string, calendarType entities.Calendar, year, month, day, hour, minute int) (int, error)
 	RemoveSchedule(scheduleId int) error
 	GetFeatureFlagByName(name string) (*entities.FeatureFlag, error)
+	GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error)
 }
 
 type PostgresRepository struct {
 	DB *sql.DB
 }
-
-type CalendarType int
-
-const (
-	_ CalendarType = iota
-	Shamsi
-	Qama
-)
 
 func CreateNewRepository(db *sql.DB) Repository {
 	return &PostgresRepository{
@@ -80,7 +73,7 @@ func (repo *PostgresRepository) AddFeatureFlag(ownerId int, featureFlag string) 
 	return err
 }
 
-func (repo *PostgresRepository) AddSchedule(featureFlag, value string, calendarType CalendarType, year, month, day, hour, minute int) (int, error) {
+func (repo *PostgresRepository) AddSchedule(featureFlag, value string, calendarType entities.Calendar, year, month, day, hour, minute int) (int, error) {
 	query := `
 	INSERT INTO schedule(feature_flag, value, calendar_type, year, month, day, hour, minute, time) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 	var scheduleId int
@@ -111,6 +104,29 @@ func (repo *PostgresRepository) GetFeatureFlagByName(name string) (*entities.Fea
 	}
 
 	return &featureFlag, nil
+}
+
+func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error) {
+	query := `
+	SELECT feature_flag, owner_id, unix_time FROM feature_flag WHERE owner_id=$1;
+	`
+	var featureFlags []entities.FeatureFlag
+	rows, err := repo.DB.Query(query, ownerId)
+	defer rows.Close()
+
+	if err != nil {
+		return featureFlags, err
+	}
+
+	var featureFlag entities.FeatureFlag
+	for rows.Next() {
+		err := rows.Scan(&featureFlag.Name, &featureFlag.OwnerId, &featureFlag.UnixTime)
+		if err != nil {
+			return featureFlags, err
+		}
+		featureFlags = append(featureFlags, featureFlag)
+	}
+	return featureFlags, nil
 }
 
 func (repo *PostgresRepository) Init() error {

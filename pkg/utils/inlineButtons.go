@@ -1,6 +1,9 @@
 package utils
 
-import "github.com/fatemehkarimi/chronos_bot/entities"
+import (
+	"fmt"
+	"github.com/fatemehkarimi/chronos_bot/entities"
+)
 
 const (
 	AddFeatureFlagCallbackData = "add feature_flag"
@@ -47,4 +50,17 @@ func GetScheduleReplyMarkup() entities.ReplyMarkup {
 	}
 
 	return replyMarkup
+}
+
+func GetReplyMarkupFromFeatureFlags(featureFlags []entities.FeatureFlag) entities.ReplyMarkup {
+	inlineKeyboard := make([][]entities.InlineKeyboardButton, len(featureFlags))
+	for idx, featureFlag := range featureFlags {
+		callbackData := fmt.Sprintf("feature_flag %s", featureFlag.Name)
+		inlineKeyboard[idx] = []entities.InlineKeyboardButton{
+			entities.InlineKeyboardButton{Text: featureFlag.Name, CallbackData: &callbackData},
+		}
+	}
+	return entities.InlineKeyboardMarkup{
+		InlineKeyboard: inlineKeyboard,
+	}
 }
