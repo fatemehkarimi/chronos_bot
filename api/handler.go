@@ -60,7 +60,7 @@ func (h *HttpHandler) GetUpdates(w http.ResponseWriter, r *http.Request) {
 	h.updateId = max(h.updateId, update.UpdateId)
 }
 
-func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Message) {
+func (h *HttpHandler) HandleMessageUpdate(updateId int, message *entities.Message) {
 	chat := message.Chat
 	if chat.Type != "private" {
 		return
@@ -97,10 +97,16 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 	}
 
 	userState := h.userStates[fmt.Sprint(chatId)]
+	fmt.Println("here user state name = ", userState.StateName)
 	switch userState.StateName {
 	case entities.AddFeatureFlagState:
-		h.AddFeatureFlag(updatedId, chatId, message)
-		return
+		h.AddFeatureFlag(updateId, chatId, message)
+	case entities.GetScheduleState:
+		h.HandleGetSchedule(updateId, int(chatId), *message)
+	case entities.GetValueState:
+		h.HandleGetValues(updateId, int(chatId), *message)
+	case entities.GetUserListState:
+		h.HandleUsersList(updateId, int(chatId), *message)
 	default:
 		slog.Error("unhandled default case", slog.Int("stateName", int(userState.StateName)))
 	}
@@ -108,32 +114,24 @@ func (h *HttpHandler) HandleMessageUpdate(updatedId int, message *entities.Messa
 
 func (h *HttpHandler) HandleCallbackQueryUpdate(updateId int, callbackQuery *entities.CallbackQuery) {
 	data := callbackQuery.Data
-	fmt.Println(
-		"here callback data = ",
-		*data == utils.KhorshidiCalendarCallbackData,
-		*data == utils.GeorgianCalendarCallbackData,
-		*data == utils.QamariCalendarCallbackData,
-	)
 	switch {
 	case *data == utils.AddFeatureFlagCallbackData:
 		h.HandleAddFeatureFlagCallbackData(updateId, callbackQuery.From.Id)
-		break
 	case *data == utils.AddScheduleCallbackData:
 		h.HandleAddScheduleCallbackData(updateId, callbackQuery.From.Id)
-		break
 	case *data == utils.KhorshidiCalendarCallbackData:
 		h.HandleCalendarTypeCallbackData(updateId, callbackQuery.From.Id, utils.CallbackDataToCalendarType(*data))
 	case *data == utils.GeorgianCalendarCallbackData:
 		h.HandleCalendarTypeCallbackData(updateId, callbackQuery.From.Id, utils.CallbackDataToCalendarType(*data))
 	case *data == utils.QamariCalendarCallbackData:
 		h.HandleCalendarTypeCallbackData(updateId, callbackQuery.From.Id, utils.CallbackDataToCalendarType(*data))
-		break
 	case strings.HasPrefix(*data, "feature_flag"):
 		h.HandleChooseFeatureFlag(updateId, callbackQuery.From.Id, *data)
-		break
+	case *data == utils.UsersListForAllCallbackData:
+		value := "*"
+		h.HandleUsersList(updateId, callbackQuery.From.Id, entities.Message{Text: &value})
 	default:
 		slog.Info("unknown callback query data", data)
-		return
 	}
 }
 
@@ -247,24 +245,30 @@ func (h *HttpHandler) HandleSendUserFeatureFlags(updateId, chatId int) {
 
 func (h *HttpHandler) HandleCalendarTypeCallbackData(updateId, chatId int, calendarType entities.Calendar) {
 	userState := h.userStates[fmt.Sprint(chatId)]
-	fmt.Println("here handle calendar type callback data = ", userState.StateName)
 	if userState.StateName != entities.ChooseCalendarTypeState {
 		slog.Error("user cannot set calendar type in this state", slog.Int("updateId", updateId), slog.Int("chatId", chatId), slog.Any("state", userState.StateName))
 		h.ResetUserStateAndSendResetMessage(chatId)
 		return
 	}
 
-	userState.SelectedCalendarType = &calendarType
+	schedule := userState.Schedule
+	if schedule != nil {
+		schedule.CalendarType = calendarType
+
+		h.userStates[fmt.Sprint(chatId)] = entities.UserState{
+			StateName: entities.GetScheduleState,
+			Schedule:  schedule,
+		}
+	}
 
 	userState.StateName = entities.GetScheduleState
 	chMessage := make(chan entities.MethodResponse)
 
-	fmt.Println("here")
 	go h.api.SendMessage(
 		fmt.Sprint(chatId),
 		`برنامه زمانی پرچم را با الگوی زیر بفرستید. برای پارامترهای روز(d)، ساعت(hh) و دقیقه(mm) باید مقداری تعیین شود اما پارامترهای دیگر می‌توانند خالی باشند. اگر به راهنمایی بیشتر نیاز دارید، /help را بفرستید
-y: ***
-m: ***
+y:
+m:
 d: 20
 hh: 0
 mm: 30
@@ -289,7 +293,7 @@ func (h *HttpHandler) ResetUserStateAndSendResetMessage(chatId int) {
 func (h *HttpHandler) SendContactDeveloperErrorMessage(updateId, chatId int) {
 	chMessage := make(chan entities.MethodResponse)
 	replyMarkup := utils.GetMainReplyMarkup()
-	go h.api.SendMessage(fmt.Sprint(chatId), "خطای نامشخص در افزودن پرچم رخ داده است. این موضوع را با توسعه دهنده در میان بگذارید.", replyMarkup, chMessage)
+	go h.api.SendMessage(fmt.Sprint(chatId), "خطای نامشخص رخ داده است. این موضوع را با توسعه دهنده در میان بگذارید.", replyMarkup, chMessage)
 
 	result := <-chMessage
 	if result.Err != nil {
@@ -311,11 +315,11 @@ func (h *HttpHandler) HandleChooseFeatureFlag(updateId, chatId int, featureFlagC
 		return
 	}
 
-	userState.SelectedFeatureFlag = &entities.FeatureFlag{Name: featureFlagName, OwnerId: chatId}
-	h.HandleSendCalendarType(updateId, chatId)
+	newFeatureFlag := entities.FeatureFlag{Name: featureFlagName, OwnerId: chatId}
+	h.HandleSendCalendarType(updateId, chatId, &newFeatureFlag)
 }
 
-func (h *HttpHandler) HandleSendCalendarType(updateId, chatId int) {
+func (h *HttpHandler) HandleSendCalendarType(updateId, chatId int, featureFlag *entities.FeatureFlag) {
 	ch := make(chan entities.MethodResponse)
 	replyMarkup := utils.GetScheduleReplyMarkup()
 	go h.api.SendMessage(fmt.Sprint(chatId), "تقویم برنامه زمانی را انتخاب کنید", replyMarkup, ch)
@@ -325,10 +329,77 @@ func (h *HttpHandler) HandleSendCalendarType(updateId, chatId int) {
 		h.ResetUserStateAndSendResetMessage(chatId)
 		return
 	} else {
-		prevUserState := h.userStates[fmt.Sprint(chatId)]
 		h.userStates[fmt.Sprint(chatId)] = entities.UserState{
-			StateName:           entities.ChooseCalendarTypeState,
-			SelectedFeatureFlag: prevUserState.SelectedFeatureFlag,
+			StateName: entities.ChooseCalendarTypeState,
+			Schedule: &entities.Schedule{
+				FeatureFlagName: featureFlag.Name,
+			},
 		}
+	}
+}
+
+func (h *HttpHandler) HandleGetSchedule(updateId, chatId int, message entities.Message) {
+	text := message.Text
+	schedule, err := utils.ParseSchedulePattern(*text)
+
+	if err != nil {
+		go h.api.SendMessage(fmt.Sprint(chatId), err.Error(), nil, nil)
+		return
+	}
+
+	userSchedule := h.userStates[fmt.Sprint(chatId)].Schedule
+	if userSchedule != nil {
+		userSchedule.Year = schedule.Year
+		userSchedule.Month = schedule.Month
+		userSchedule.Day = schedule.Day
+		userSchedule.Hour = schedule.Hour
+		userSchedule.Minute = schedule.Minute
+		h.userStates[fmt.Sprint(chatId)] = entities.UserState{
+			StateName: entities.GetValueState,
+			Schedule:  userSchedule,
+		}
+	} else {
+		h.SendContactDeveloperErrorMessage(updateId, chatId)
+		slog.Error("user is in userSchedule state but not feature flag value is provided", slog.Int("updateId", updateId), slog.Int("chatId", chatId))
+		return
+	}
+	go h.api.SendMessage(fmt.Sprint(chatId), "مقدار(value) پرچم را وارد کنید. با اجرای برنامه زمانی، این مقدار برای کاربران تنظیم می شود.", nil, nil)
+}
+
+func (h *HttpHandler) HandleGetValues(updateId, chatId int, message entities.Message) {
+	value := message.Text
+	userState := h.userStates[fmt.Sprint(chatId)]
+	schedule := userState.Schedule
+	if schedule != nil {
+		schedule.Value = *value
+		h.userStates[fmt.Sprint(chatId)] = entities.UserState{
+			StateName: entities.GetUserListState,
+			Schedule:  schedule,
+		}
+	}
+
+	ch := make(chan entities.MethodResponse)
+	replyMarkup := utils.GetUsersListCReplyMarkup()
+	go h.api.SendMessage(fmt.Sprint(chatId), "شناسه‌ی کاربری(id) کاربرانی که می‌خواهید برای آنها این مقدار تنظیم شود را بنویسید. برای تنظیم مقدار برای همه‌ی کاربران، روی دکمه 'همه کاربران' کلیک کنید. ", replyMarkup, ch)
+}
+
+func (h *HttpHandler) HandleUsersList(updateId, chatId int, message entities.Message) {
+	value := message.Text
+	userState := h.userStates[fmt.Sprint(chatId)]
+	schedule := userState.Schedule
+	fmt.Println("here value = ", value)
+	if schedule != nil {
+		schedule.UsersList = *value
+		scheduleId, err := h.db.AddSchedule(*schedule)
+
+		if err != nil {
+			h.ResetUserStateAndSendResetMessage(chatId)
+			slog.Error("error save schedule. err = ", slog.Any("error", err))
+			return
+		}
+
+		h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.StartState}
+		replyMarkup := utils.GetMainReplyMarkup()
+		go h.api.SendMessage(fmt.Sprint(chatId), fmt.Sprintf("برنامه زمانی با شناسه %d با موفقیت ذخیره شد", scheduleId), replyMarkup, nil)
 	}
 }

@@ -6,6 +6,20 @@ type FeatureFlag struct {
 	UnixTime int64
 }
 
+type Schedule struct {
+	ScheduleId      int
+	FeatureFlagName string
+	Value           string
+	UsersList       string
+	CalendarType    Calendar
+	Year            int
+	Month           int
+	Day             int
+	Hour            int
+	Minute          int
+	UnixTime        int64
+}
+
 type State int
 
 const (
@@ -19,14 +33,18 @@ const (
 	ChooseFeatureFlagState
 	ChooseCalendarTypeState
 	GetScheduleState
+	GetValueState
+	GetUserListState
 )
 
 type UserState struct {
 	StateName State
 
 	// for schedule state
-	SelectedFeatureFlag  *FeatureFlag
-	SelectedCalendarType *Calendar
+	//SelectedFeatureFlag  *FeatureFlag
+	//SelectedCalendarType *Calendar
+	//FeatureFlagValue     *string
+	Schedule *Schedule
 }
 
 type Calendar int

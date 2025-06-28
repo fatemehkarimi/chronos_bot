@@ -21,7 +21,7 @@ type Repository interface {
 	CreateTableFeatureFlag() error
 	CreateTableSchedule() error
 	AddFeatureFlag(ownerId int, featureFlag string) error
-	AddSchedule(featureFlag, value string, calendarType entities.Calendar, year, month, day, hour, minute int) (int, error)
+	AddSchedule(schedule entities.Schedule) (int, error)
 	RemoveSchedule(scheduleId int) error
 	GetFeatureFlagByName(name string) (*entities.FeatureFlag, error)
 	GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error)
@@ -56,6 +56,7 @@ func (repo *PostgresRepository) CreateTableSchedule() error {
 		feature_flag VARCHAR REFERENCES feature_flag(feature_flag),
 		value TEXT,
 		calendar_type SMALLINT,
+	    users_list TEXT,
 		year INT,
 		month INT,
 		day INT,
@@ -73,11 +74,35 @@ func (repo *PostgresRepository) AddFeatureFlag(ownerId int, featureFlag string) 
 	return err
 }
 
-func (repo *PostgresRepository) AddSchedule(featureFlag, value string, calendarType entities.Calendar, year, month, day, hour, minute int) (int, error) {
+func (repo *PostgresRepository) AddSchedule(schedule entities.Schedule) (int, error) {
 	query := `
-	INSERT INTO schedule(feature_flag, value, calendar_type, year, month, day, hour, minute, time) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+	INSERT INTO schedule(
+	 	feature_flag,
+	 	value,
+	 	users_list,
+	 	calendar_type,
+	 	year,
+	 	month,
+	 	day,
+	 	hour,
+	 	minute,
+	 	unix_time
+	) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING schedule_id`
 	var scheduleId int
-	err := repo.DB.QueryRow(query, featureFlag, value, calendarType, year, month, day, hour, minute, time.Now().Unix()).Scan(&scheduleId)
+
+	err := repo.DB.QueryRow(
+		query,
+		schedule.FeatureFlagName,
+		schedule.Value,
+		schedule.UsersList,
+		schedule.CalendarType,
+		schedule.Year,
+		schedule.Month,
+		schedule.Day,
+		schedule.Hour,
+		schedule.Minute,
+		time.Now().Unix(),
+	).Scan(&scheduleId)
 	return scheduleId, err
 }
 

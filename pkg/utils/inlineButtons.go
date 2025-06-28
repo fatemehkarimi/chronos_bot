@@ -12,6 +12,8 @@ const (
 	KhorshidiCalendarCallbackData = "khorshidi calendar"
 	GeorgianCalendarCallbackData  = "georgian calendar"
 	QamariCalendarCallbackData    = "qamari calendar"
+
+	UsersListForAllCallbackData = "usersList for all"
 )
 
 func GetMainReplyMarkup() entities.ReplyMarkup {
@@ -63,4 +65,16 @@ func GetReplyMarkupFromFeatureFlags(featureFlags []entities.FeatureFlag) entitie
 	return entities.InlineKeyboardMarkup{
 		InlineKeyboard: inlineKeyboard,
 	}
+}
+
+func GetUsersListCReplyMarkup() entities.ReplyMarkup {
+	usersListCallbackData := UsersListForAllCallbackData
+	replyMarkup := entities.InlineKeyboardMarkup{
+		InlineKeyboard: [][]entities.InlineKeyboardButton{
+			{
+				entities.InlineKeyboardButton{Text: "همه‌ی کاربران", CallbackData: &usersListCallbackData},
+			},
+		},
+	}
+	return replyMarkup
 }
