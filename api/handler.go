@@ -131,7 +131,7 @@ func (h *HttpHandler) HandleCallbackQueryUpdate(updateId int, callbackQuery *ent
 		value := "*"
 		h.HandleUsersList(updateId, callbackQuery.From.Id, entities.Message{Text: &value})
 	default:
-		slog.Info("unknown callback query data", data)
+		slog.Info("unknown callback query data", slog.String("data", *data))
 	}
 }
 
