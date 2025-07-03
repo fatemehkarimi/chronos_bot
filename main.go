@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/fatemehkarimi/chronos_bot/scheduler"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,7 +19,9 @@ import (
 )
 
 type Config struct {
-	Database repository.DatabaseConfig
+	Database   repository.DatabaseConfig
+	BotToken   string
+	LogChannel string
 }
 
 func LoadConfig() (Config, error) {
@@ -34,8 +37,6 @@ func LoadConfig() (Config, error) {
 	err := viper.Unmarshal(&cfg)
 	return cfg, err
 }
-
-var botToken = "2129549151:GWWYcJGIbB2dsiBogDXWOvctyDmdJhfCnxo7wOIy"
 
 func main() {
 	config, err := LoadConfig()
@@ -57,7 +58,12 @@ func main() {
 		slog.Error("failed to open db", slog.Any("err", err))
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			slog.Error("failed to close db", slog.Any("err", err))
+		}
+	}(db)
 
 	err = db.Ping()
 	if err != nil {
@@ -73,7 +79,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	httpHandler := api.NewHttpHandler(&postgresRepo, botToken)
+	httpHandler := api.NewHttpHandler(&postgresRepo, config.BotToken)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/getUpdates", httpHandler.GetUpdates)
@@ -86,9 +92,20 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	go checkForUpdates(botToken, httpHandler)
-	server.ListenAndServe()
+	baleApi := api.NewBaleApi(config.BotToken)
+	awxScheduler := scheduler.NewScheduler(&postgresRepo, baleApi, config.LogChannel)
 
+	go awxScheduler.LaunchSchedulesInRange(
+		entities.GeorgianCalendar,
+		entities.DayTime{Hour: time.Now().Hour(), Minute: time.Now().Minute()},
+		entities.DayTime{Hour: 23, Minute: 0},
+	)
+
+	go checkForUpdates(config.BotToken, httpHandler)
+	err = server.ListenAndServe()
+	if err != nil {
+		os.Exit(1)
+	}
 }
 
 func checkForUpdates(botToken string, handler api.Handler) {

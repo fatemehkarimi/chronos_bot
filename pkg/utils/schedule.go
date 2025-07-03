@@ -3,8 +3,10 @@ package utils
 import (
 	"fmt"
 	"github.com/fatemehkarimi/chronos_bot/entities"
+	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func ParseSchedulePattern(pattern string) (*entities.Schedule, error) {
@@ -64,4 +66,25 @@ func ParseSchedulePattern(pattern string) (*entities.Schedule, error) {
 	}
 
 	return &schedule, nil
+}
+
+func ScheduleTaskOnSameDay(dayTime entities.DayTime, task func() error) error {
+	now := time.Now()
+	scheduleTime := time.Date(now.Year(), now.Month(), now.Day(), dayTime.Hour, dayTime.Minute, 0, 0, now.Location())
+	diff := scheduleTime.Sub(now)
+
+	timer := time.NewTimer(diff)
+	tick := <-timer.C
+
+	slog.Info("performing task at time = ", slog.Time("time", tick))
+	err := task()
+	return err
+}
+
+func ScheduleToText(schedule entities.Schedule) string {
+	template := `%s :پرچم
+گروه کاربران: %s
+مقدار: %s
+`
+	return fmt.Sprintf(template, schedule.FeatureFlagName, schedule.UsersList, schedule.Value)
 }

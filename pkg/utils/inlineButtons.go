@@ -7,7 +7,7 @@ import (
 
 const (
 	AddFeatureFlagCallbackData = "add feature_flag"
-	AddScheduleCallbackData    = "add schedule"
+	AddScheduleCallbackData    = "add scheduler"
 
 	KhorshidiCalendarCallbackData = "khorshidi calendar"
 	GeorgianCalendarCallbackData  = "georgian calendar"

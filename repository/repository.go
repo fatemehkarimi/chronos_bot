@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/fatemehkarimi/chronos_bot/entities"
+	"log"
 	"time"
 )
 
@@ -25,6 +26,10 @@ type Repository interface {
 	RemoveSchedule(scheduleId int) error
 	GetFeatureFlagByName(name string) (*entities.FeatureFlag, error)
 	GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error)
+	GetScheduleByTime(
+		calendarType entities.Calendar, year int, month int, day int, startTime entities.DayTime,
+		endTime entities.DayTime,
+	) ([]entities.Schedule, error)
 }
 
 type PostgresRepository struct {
@@ -51,7 +56,7 @@ func (repo *PostgresRepository) CreateTableFeatureFlag() error {
 
 func (repo *PostgresRepository) CreateTableSchedule() error {
 	query := `
-	CREATE TABLE IF NOT EXISTS schedule(
+	CREATE TABLE IF NOT EXISTS scheduler(
 		schedule_id SERIAL PRIMARY KEY,
 		feature_flag VARCHAR REFERENCES feature_flag(feature_flag),
 		value TEXT,
@@ -76,7 +81,7 @@ func (repo *PostgresRepository) AddFeatureFlag(ownerId int, featureFlag string) 
 
 func (repo *PostgresRepository) AddSchedule(schedule entities.Schedule) (int, error) {
 	query := `
-	INSERT INTO schedule(
+	INSERT INTO scheduler(
 	 	feature_flag,
 	 	value,
 	 	users_list,
@@ -108,7 +113,7 @@ func (repo *PostgresRepository) AddSchedule(schedule entities.Schedule) (int, er
 
 func (repo *PostgresRepository) RemoveSchedule(scheduleId int) error {
 	query := `
-	DELETE FROM schedule where schedule_id=$1
+	DELETE FROM scheduler where schedule_id=$1
 	`
 	_, err := repo.DB.Exec(query, scheduleId)
 	return err
@@ -137,7 +142,12 @@ func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) ([]entitie
 	`
 	var featureFlags []entities.FeatureFlag
 	rows, err := repo.DB.Query(query, ownerId)
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(rows)
 
 	if err != nil {
 		return featureFlags, err
@@ -147,11 +157,64 @@ func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) ([]entitie
 	for rows.Next() {
 		err := rows.Scan(&featureFlag.Name, &featureFlag.OwnerId, &featureFlag.UnixTime)
 		if err != nil {
+			// todo: this is not really correct
 			return featureFlags, err
 		}
 		featureFlags = append(featureFlags, featureFlag)
 	}
 	return featureFlags, nil
+}
+
+func (repo *PostgresRepository) GetScheduleByTime(
+	calendarType entities.Calendar, year int, month int, day int, startTime entities.DayTime, endTime entities.DayTime,
+) ([]entities.Schedule, error) {
+	query := `
+	SELECT schedule_id, feature_flag, value, calendar_type, users_list, year, month, day, hour, minute, unix_time
+	FROM schedule
+	WHERE calendar_type = $1
+	AND day = $2
+	AND (year = 0 OR year = $3)
+	AND (month = 0 OR month = $4)
+	AND (
+		(hour = $5 AND hour = $7 AND minute >= $6 AND minute <= $8)
+		OR (hour = $5 AND minute >= $6)
+		OR (hour > $5 AND hour < $7)
+		OR (hour = $7 AND minute <= $8)
+	)
+	`
+
+	var schedules []entities.Schedule
+	rows, err := repo.DB.Query(
+		query, calendarType, day, year, month, startTime.Hour, startTime.Minute, endTime.Hour, endTime.Minute,
+	)
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(rows)
+
+	if err != nil {
+		return schedules, err
+	}
+
+	var schedule entities.Schedule
+	for rows.Next() {
+		err := rows.Scan(
+			&schedule.ScheduleId, &schedule.FeatureFlagName, &schedule.Value, &schedule.CalendarType,
+			&schedule.UsersList, &schedule.Year, &schedule.Month, &schedule.Day, &schedule.Hour, &schedule.Minute,
+			&schedule.UnixTime,
+		)
+
+		if err != nil {
+			// todo: this is not really correct
+			return schedules, err
+		}
+
+		schedules = append(schedules, schedule)
+	}
+
+	return schedules, nil
 }
 
 func (repo *PostgresRepository) Init() error {
