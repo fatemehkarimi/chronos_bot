@@ -353,7 +353,7 @@ func (h *HttpHandler) HandleCalendarTypeCallbackData(
 
 	schedule := userState.Schedule
 	if schedule != nil {
-		schedule.CalendarType = calendarType
+		schedule.Calendar.Type = calendarType
 
 		h.userStates[fmt.Sprint(chatId)] = entities.UserState{
 			StateName: entities.GetScheduleState,
@@ -488,11 +488,11 @@ func (h *HttpHandler) HandleGetSchedule(
 
 	userSchedule := h.userStates[fmt.Sprint(chatId)].Schedule
 	if userSchedule != nil {
-		userSchedule.Year = schedule.Year
-		userSchedule.Month = schedule.Month
-		userSchedule.Day = schedule.Day
-		userSchedule.Hour = schedule.Hour
-		userSchedule.Minute = schedule.Minute
+		userSchedule.Calendar.Year = schedule.Calendar.Year
+		userSchedule.Calendar.Month = schedule.Calendar.Month
+		userSchedule.Calendar.Day = schedule.Calendar.Day
+		userSchedule.Calendar.Hour = schedule.Calendar.Hour
+		userSchedule.Calendar.Minute = schedule.Calendar.Minute
 		h.userStates[fmt.Sprint(chatId)] = entities.UserState{
 			StateName: entities.GetValueState,
 			Schedule:  userSchedule,

@@ -12,8 +12,8 @@ import (
 type Scheduler interface {
 	LaunchSchedulesInRange(
 		calendar entities.Calendar,
-		startDayTime entities.DayTime,
-		endDayTime entities.DayTime,
+		startDayTime entities.CalendarTime,
+		endDayTime entities.CalendarTime,
 	)
 	OnNewSchedule(schedule entities.Schedule)
 }
@@ -34,8 +34,8 @@ func NewScheduler(
 
 func (s DBScheduler) LaunchSchedulesInRange(
 	calendar entities.Calendar,
-	startDayTime entities.DayTime,
-	endDayTime entities.DayTime,
+	startDayTime entities.CalendarTime,
+	endDayTime entities.CalendarTime,
 ) {
 	now := time.Now()
 	year := now.Year()
@@ -70,9 +70,9 @@ func (s DBScheduler) OnNewSchedule(schedule entities.Schedule) {
 }
 
 func (s DBScheduler) ScheduleAndNotify(schedule entities.Schedule) {
-	taskDayTime := entities.DayTime{
-		Hour:   schedule.Hour,
-		Minute: schedule.Minute,
+	taskDayTime := entities.CalendarTime{
+		Hour:   schedule.Calendar.Hour,
+		Minute: schedule.Calendar.Minute,
 	}
 	task := func() error {
 		SetConfig(schedule)

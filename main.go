@@ -102,8 +102,11 @@ func main() {
 
 	go awxScheduler.LaunchSchedulesInRange(
 		entities.GeorgianCalendar,
-		entities.DayTime{Hour: time.Now().Hour(), Minute: time.Now().Minute()},
-		entities.DayTime{Hour: 23, Minute: 0},
+		entities.CalendarTime{
+			Hour:   time.Now().Hour(),
+			Minute: time.Now().Minute(),
+		},
+		entities.CalendarTime{Hour: 23, Minute: 0},
 	)
 
 	go checkForUpdates(config.BotToken, httpHandler)

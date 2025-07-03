@@ -11,12 +11,7 @@ type Schedule struct {
 	FeatureFlagName string
 	Value           string
 	UsersList       string
-	CalendarType    Calendar
-	Year            int
-	Month           int
-	Day             int
-	Hour            int
-	Minute          int
+	Calendar        CalendarTime
 	UnixTime        int64
 }
 
@@ -41,9 +36,6 @@ type UserState struct {
 	StateName State
 
 	// for scheduler state
-	//SelectedFeatureFlag  *FeatureFlag
-	//SelectedCalendarType *Calendar
-	//FeatureFlagValue     *string
 	Schedule *Schedule
 }
 
@@ -56,7 +48,11 @@ const (
 	QamariCalendar
 )
 
-type DayTime struct {
+type CalendarTime struct {
+	Type   Calendar
+	Year   int
+	Month  int
+	Day    int
 	Hour   int
 	Minute int
 }
