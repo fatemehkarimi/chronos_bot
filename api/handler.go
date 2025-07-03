@@ -99,7 +99,6 @@ func (h *HttpHandler) HandleMessageUpdate(updateId int, message *entities.Messag
 	}
 
 	userState := h.userStates[fmt.Sprint(chatId)]
-	fmt.Println("here user state name = ", userState.StateName)
 	switch userState.StateName {
 	case entities.AddFeatureFlagState:
 		h.AddFeatureFlag(updateId, chatId, message)

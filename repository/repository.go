@@ -56,7 +56,7 @@ func (repo *PostgresRepository) CreateTableFeatureFlag() error {
 
 func (repo *PostgresRepository) CreateTableSchedule() error {
 	query := `
-	CREATE TABLE IF NOT EXISTS scheduler(
+	CREATE TABLE IF NOT EXISTS schedule(
 		schedule_id SERIAL PRIMARY KEY,
 		feature_flag VARCHAR REFERENCES feature_flag(feature_flag),
 		value TEXT,
@@ -81,7 +81,7 @@ func (repo *PostgresRepository) AddFeatureFlag(ownerId int, featureFlag string) 
 
 func (repo *PostgresRepository) AddSchedule(schedule entities.Schedule) (int, error) {
 	query := `
-	INSERT INTO scheduler(
+	INSERT INTO schedule(
 	 	feature_flag,
 	 	value,
 	 	users_list,
@@ -113,7 +113,7 @@ func (repo *PostgresRepository) AddSchedule(schedule entities.Schedule) (int, er
 
 func (repo *PostgresRepository) RemoveSchedule(scheduleId int) error {
 	query := `
-	DELETE FROM scheduler where schedule_id=$1
+	DELETE FROM schedule where schedule_id=$1
 	`
 	_, err := repo.DB.Exec(query, scheduleId)
 	return err
