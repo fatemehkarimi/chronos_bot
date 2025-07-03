@@ -6,7 +6,6 @@ import (
 	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
 	"github.com/fatemehkarimi/chronos_bot/repository"
 	"log/slog"
-	"time"
 )
 
 type Scheduler interface {
@@ -37,13 +36,13 @@ func (s DBScheduler) LaunchSchedulesInRange(
 	startDayTime entities.CalendarTime,
 	endDayTime entities.CalendarTime,
 ) {
-	now := time.Now()
-	year := now.Year()
-	month := int(now.Month())
-	day := now.Day()
+	now := calendar.GetToday()
+	year := now.Year
+	month := now.Month
+	day := now.Day
 
 	schedules, err := s.repo.GetScheduleByTime(
-		entities.GeorgianCalendar,
+		entities.GeorgianCalendarType,
 		year,
 		month,
 		day,
@@ -64,7 +63,8 @@ func (s DBScheduler) LaunchSchedulesInRange(
 }
 
 func (s DBScheduler) OnNewSchedule(schedule entities.Schedule) {
-	if utils.ShouldRunToday(schedule) {
+	calendar := utils.GetCalendarByType(schedule.Calendar.Type)
+	if utils.ShouldRunToday(calendar, schedule) {
 		go s.ScheduleAndNotify(schedule)
 	}
 }

@@ -39,17 +39,17 @@ type UserState struct {
 	Schedule *Schedule
 }
 
-type Calendar int
+type CalendarType int
 
 const (
-	_ Calendar = iota
-	KhorshidiCalendar
-	GeorgianCalendar
-	QamariCalendar
+	_ CalendarType = iota
+	KhorshidiCalendarType
+	GeorgianCalendarType
+	QamariCalendarType
 )
 
 type CalendarTime struct {
-	Type   Calendar
+	Type   CalendarType
 	Year   int
 	Month  int
 	Day    int

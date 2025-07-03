@@ -106,13 +106,16 @@ func ScheduleToText(schedule entities.Schedule) string {
 	)
 }
 
-func ShouldRunToday(schedule entities.Schedule) bool {
-	now := time.Now()
-	year := now.Year()
-	month := int(now.Month())
-	day := now.Day()
-	hour := now.Hour()
-	minute := now.Minute()
+func ShouldRunToday(
+	calendar entities.Calendar,
+	schedule entities.Schedule,
+) bool {
+	now := calendar.GetToday()
+	year := now.Year
+	month := now.Month
+	day := now.Day
+	hour := now.Hour
+	minute := now.Minute
 
 	return day == schedule.Calendar.Day &&
 		(schedule.Calendar.Month == 0 || schedule.Calendar.Month == month) &&

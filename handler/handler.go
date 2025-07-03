@@ -337,7 +337,7 @@ func (h *HttpHandler) HandleSendUserFeatureFlags(updateId, chatId int) {
 
 func (h *HttpHandler) HandleCalendarTypeCallbackData(
 	updateId, chatId int,
-	calendarType entities.Calendar,
+	calendarType entities.CalendarType,
 ) {
 	userState := h.userStates[fmt.Sprint(chatId)]
 	if userState.StateName != entities.ChooseCalendarTypeState {

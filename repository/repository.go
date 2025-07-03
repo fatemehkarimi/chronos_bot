@@ -27,7 +27,7 @@ type Repository interface {
 	GetFeatureFlagByName(name string) (*entities.FeatureFlag, error)
 	GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error)
 	GetScheduleByTime(
-		calendarType entities.Calendar,
+		calendarType entities.CalendarType,
 		year int,
 		month int,
 		day int,
@@ -190,7 +190,7 @@ func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) (
 }
 
 func (repo *PostgresRepository) GetScheduleByTime(
-	calendarType entities.Calendar,
+	calendarType entities.CalendarType,
 	year int,
 	month int,
 	day int,
