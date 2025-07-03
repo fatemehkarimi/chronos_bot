@@ -1,9 +1,11 @@
-package api
+package handler
 
 import (
 	"encoding/json"
 	"fmt"
+	api "github.com/fatemehkarimi/chronos_bot/api"
 	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
+	"github.com/fatemehkarimi/chronos_bot/scheduler"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -20,14 +22,20 @@ type Handler interface {
 
 type HttpHandler struct {
 	db         repository.Repository
-	api        Api
+	api        api.Api
 	updateId   int
 	userStates map[string]entities.UserState
+	scheduler  scheduler.Scheduler
 }
 
-func NewHttpHandler(db repository.Repository, token string) Handler {
-	api := NewBaleApi(token)
-	return &HttpHandler{db: db, api: api, userStates: map[string]entities.UserState{}, updateId: 57}
+func NewHttpHandler(db repository.Repository, Api api.Api, scheduler scheduler.Scheduler) Handler {
+	return &HttpHandler{
+		db:         db,
+		api:        Api,
+		userStates: map[string]entities.UserState{},
+		updateId:   57,
+		scheduler:  scheduler,
+	}
 }
 
 func (h *HttpHandler) GetLastProcessedUpdateId() int {
@@ -435,5 +443,7 @@ func (h *HttpHandler) HandleUsersList(updateId, chatId int, message entities.Mes
 			fmt.Sprint(chatId), fmt.Sprintf("برنامه زمانی با شناسه %d با موفقیت ذخیره شد", scheduleId), replyMarkup,
 			nil,
 		)
+
+		h.scheduler.OnNewSchedule(*schedule)
 	}
 }

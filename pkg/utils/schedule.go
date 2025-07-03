@@ -82,9 +82,24 @@ func ScheduleTaskOnSameDay(dayTime entities.DayTime, task func() error) error {
 }
 
 func ScheduleToText(schedule entities.Schedule) string {
-	template := `%s :پرچم
+	template := `پرچم: %s
 گروه کاربران: %s
 مقدار: %s
 `
 	return fmt.Sprintf(template, schedule.FeatureFlagName, schedule.UsersList, schedule.Value)
+}
+
+func ShouldRunToday(schedule entities.Schedule) bool {
+	now := time.Now()
+	year := now.Year()
+	month := int(now.Month())
+	day := now.Day()
+	hour := now.Hour()
+	minute := now.Minute()
+
+	return day == schedule.Day &&
+		(schedule.Month == 0 || schedule.Month == month) &&
+		(schedule.Year == 0 || schedule.Year == year) &&
+		((schedule.Hour == hour && schedule.Minute >= minute) ||
+			(schedule.Hour > hour))
 }

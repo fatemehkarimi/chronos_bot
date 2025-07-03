@@ -11,6 +11,7 @@ import (
 
 type Scheduler interface {
 	LaunchSchedulesInRange(calendar entities.Calendar, startDayTime entities.DayTime, endDayTime entities.DayTime)
+	OnNewSchedule(schedule entities.Schedule)
 }
 
 type DBScheduler struct {
@@ -41,18 +42,26 @@ func (s DBScheduler) LaunchSchedulesInRange(
 	slog.Info("found schedules", slog.Any("schedules", schedules))
 
 	for _, schedule := range schedules {
-		taskDayTime := entities.DayTime{Hour: schedule.Hour, Minute: schedule.Minute}
-		task := func() error {
-			SetConfig(schedule)
-			s.api.SendMessage(s.logChannel, utils.ScheduleToText(schedule), nil, nil)
-			return nil
-		}
-		go func() {
-			err := utils.ScheduleTaskOnSameDay(taskDayTime, task)
-			if err != nil {
-				slog.Error("error scheduling task on same day", slog.Any("error", err))
-			}
-		}()
+		go s.ScheduleAndNotify(schedule)
+	}
+}
+
+func (s DBScheduler) OnNewSchedule(schedule entities.Schedule) {
+	if utils.ShouldRunToday(schedule) {
+		go s.ScheduleAndNotify(schedule)
+	}
+}
+
+func (s DBScheduler) ScheduleAndNotify(schedule entities.Schedule) {
+	taskDayTime := entities.DayTime{Hour: schedule.Hour, Minute: schedule.Minute}
+	task := func() error {
+		SetConfig(schedule)
+		s.api.SendMessage(s.logChannel, utils.ScheduleToText(schedule), nil, nil)
+		return nil
+	}
+	err := utils.ScheduleTaskOnSameDay(taskDayTime, task)
+	if err != nil {
+		slog.Error("error scheduling task on same day", slog.Any("error", err))
 	}
 }
 
