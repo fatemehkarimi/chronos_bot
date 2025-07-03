@@ -4,13 +4,13 @@ import (
 	"github.com/fatemehkarimi/chronos_bot/entities"
 )
 
-func CallbackDataToCalendarType(data string) entities.Calendar {
+func CallbackDataToCalendarType(data string) entities.CalendarType {
 	switch data {
 	case GeorgianCalendarCallbackData:
-		return entities.GeorgianCalendar
+		return entities.GeorgianCalendarType
 	case QamariCalendarCallbackData:
-		return entities.QamariCalendar
+		return entities.QamariCalendarType
 	default:
-		return entities.KhorshidiCalendar
+		return entities.KhorshidiCalendarType
 	}
 }

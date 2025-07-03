@@ -6,14 +6,13 @@ import (
 	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
 	"github.com/fatemehkarimi/chronos_bot/repository"
 	"log/slog"
-	"time"
 )
 
 type Scheduler interface {
 	LaunchSchedulesInRange(
 		calendar entities.Calendar,
-		startDayTime entities.DayTime,
-		endDayTime entities.DayTime,
+		startDayTime entities.CalendarTime,
+		endDayTime entities.CalendarTime,
 	)
 	OnNewSchedule(schedule entities.Schedule)
 }
@@ -34,16 +33,16 @@ func NewScheduler(
 
 func (s DBScheduler) LaunchSchedulesInRange(
 	calendar entities.Calendar,
-	startDayTime entities.DayTime,
-	endDayTime entities.DayTime,
+	startDayTime entities.CalendarTime,
+	endDayTime entities.CalendarTime,
 ) {
-	now := time.Now()
-	year := now.Year()
-	month := int(now.Month())
-	day := now.Day()
+	now := calendar.GetToday()
+	year := now.Year
+	month := now.Month
+	day := now.Day
 
 	schedules, err := s.repo.GetScheduleByTime(
-		entities.GeorgianCalendar,
+		entities.GeorgianCalendarType,
 		year,
 		month,
 		day,
@@ -64,15 +63,16 @@ func (s DBScheduler) LaunchSchedulesInRange(
 }
 
 func (s DBScheduler) OnNewSchedule(schedule entities.Schedule) {
-	if utils.ShouldRunToday(schedule) {
+	calendar := utils.GetCalendarByType(schedule.Calendar.Type)
+	if utils.ShouldRunToday(calendar, schedule) {
 		go s.ScheduleAndNotify(schedule)
 	}
 }
 
 func (s DBScheduler) ScheduleAndNotify(schedule entities.Schedule) {
-	taskDayTime := entities.DayTime{
-		Hour:   schedule.Hour,
-		Minute: schedule.Minute,
+	taskDayTime := entities.CalendarTime{
+		Hour:   schedule.Calendar.Hour,
+		Minute: schedule.Calendar.Minute,
 	}
 	task := func() error {
 		SetConfig(schedule)

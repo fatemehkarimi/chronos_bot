@@ -11,12 +11,7 @@ type Schedule struct {
 	FeatureFlagName string
 	Value           string
 	UsersList       string
-	CalendarType    Calendar
-	Year            int
-	Month           int
-	Day             int
-	Hour            int
-	Minute          int
+	Calendar        CalendarTime
 	UnixTime        int64
 }
 
@@ -41,22 +36,23 @@ type UserState struct {
 	StateName State
 
 	// for scheduler state
-	//SelectedFeatureFlag  *FeatureFlag
-	//SelectedCalendarType *Calendar
-	//FeatureFlagValue     *string
 	Schedule *Schedule
 }
 
-type Calendar int
+type CalendarType int
 
 const (
-	_ Calendar = iota
-	KhorshidiCalendar
-	GeorgianCalendar
-	QamariCalendar
+	_ CalendarType = iota
+	KhorshidiCalendarType
+	GeorgianCalendarType
+	QamariCalendarType
 )
 
-type DayTime struct {
+type CalendarTime struct {
+	Type   CalendarType
+	Year   int
+	Month  int
+	Day    int
 	Hour   int
 	Minute int
 }

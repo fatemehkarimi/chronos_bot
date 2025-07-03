@@ -27,12 +27,12 @@ type Repository interface {
 	GetFeatureFlagByName(name string) (*entities.FeatureFlag, error)
 	GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error)
 	GetScheduleByTime(
-		calendarType entities.Calendar,
+		calendarType entities.CalendarType,
 		year int,
 		month int,
 		day int,
-		startTime entities.DayTime,
-		endTime entities.DayTime,
+		startTime entities.CalendarTime,
+		endTime entities.CalendarTime,
 	) ([]entities.Schedule, error)
 }
 
@@ -110,12 +110,12 @@ func (repo *PostgresRepository) AddSchedule(schedule entities.Schedule) (
 		schedule.FeatureFlagName,
 		schedule.Value,
 		schedule.UsersList,
-		schedule.CalendarType,
-		schedule.Year,
-		schedule.Month,
-		schedule.Day,
-		schedule.Hour,
-		schedule.Minute,
+		schedule.Calendar.Type,
+		schedule.Calendar.Year,
+		schedule.Calendar.Month,
+		schedule.Calendar.Day,
+		schedule.Calendar.Hour,
+		schedule.Calendar.Minute,
 		time.Now().Unix(),
 	).Scan(&scheduleId)
 	return scheduleId, err
@@ -190,12 +190,12 @@ func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) (
 }
 
 func (repo *PostgresRepository) GetScheduleByTime(
-	calendarType entities.Calendar,
+	calendarType entities.CalendarType,
 	year int,
 	month int,
 	day int,
-	startTime entities.DayTime,
-	endTime entities.DayTime,
+	startTime entities.CalendarTime,
+	endTime entities.CalendarTime,
 ) ([]entities.Schedule, error) {
 	query := `
 	SELECT schedule_id, feature_flag, value, calendar_type, users_list, year, month, day, hour, minute, unix_time
@@ -241,13 +241,13 @@ func (repo *PostgresRepository) GetScheduleByTime(
 			&schedule.ScheduleId,
 			&schedule.FeatureFlagName,
 			&schedule.Value,
-			&schedule.CalendarType,
+			&schedule.Calendar.Type,
 			&schedule.UsersList,
-			&schedule.Year,
-			&schedule.Month,
-			&schedule.Day,
-			&schedule.Hour,
-			&schedule.Minute,
+			&schedule.Calendar.Year,
+			&schedule.Calendar.Month,
+			&schedule.Calendar.Day,
+			&schedule.Calendar.Hour,
+			&schedule.Calendar.Minute,
 			&schedule.UnixTime,
 		)
 

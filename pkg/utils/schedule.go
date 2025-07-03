@@ -49,26 +49,29 @@ func ParseSchedulePattern(pattern string) (*entities.Schedule, error) {
 	for k, _ := range scheduleKeys {
 		switch k {
 		case "y":
-			schedule.Year = result["y"]
+			schedule.Calendar.Year = result["y"]
 		case "m":
-			schedule.Month = result["m"]
+			schedule.Calendar.Month = result["m"]
 		case "d":
-			schedule.Day = result["d"]
+			schedule.Calendar.Day = result["d"]
 		case "hh":
-			schedule.Hour = result["hh"]
+			schedule.Calendar.Hour = result["hh"]
 		case "mm":
-			schedule.Minute = result["mm"]
+			schedule.Calendar.Minute = result["mm"]
 		}
 	}
 
-	if schedule.Day == 0 {
+	if schedule.Calendar.Day == 0 {
 		return nil, fmt.Errorf("مقداری برای روز نیست. لطفا (d) را بفرستید")
 	}
 
 	return &schedule, nil
 }
 
-func ScheduleTaskOnSameDay(dayTime entities.DayTime, task func() error) error {
+func ScheduleTaskOnSameDay(
+	dayTime entities.CalendarTime,
+	task func() error,
+) error {
 	now := time.Now()
 	scheduleTime := time.Date(
 		now.Year(),
@@ -103,17 +106,20 @@ func ScheduleToText(schedule entities.Schedule) string {
 	)
 }
 
-func ShouldRunToday(schedule entities.Schedule) bool {
-	now := time.Now()
-	year := now.Year()
-	month := int(now.Month())
-	day := now.Day()
-	hour := now.Hour()
-	minute := now.Minute()
+func ShouldRunToday(
+	calendar entities.Calendar,
+	schedule entities.Schedule,
+) bool {
+	now := calendar.GetToday()
+	year := now.Year
+	month := now.Month
+	day := now.Day
+	hour := now.Hour
+	minute := now.Minute
 
-	return day == schedule.Day &&
-		(schedule.Month == 0 || schedule.Month == month) &&
-		(schedule.Year == 0 || schedule.Year == year) &&
-		((schedule.Hour == hour && schedule.Minute >= minute) ||
-			(schedule.Hour > hour))
+	return day == schedule.Calendar.Day &&
+		(schedule.Calendar.Month == 0 || schedule.Calendar.Month == month) &&
+		(schedule.Calendar.Year == 0 || schedule.Calendar.Year == year) &&
+		((schedule.Calendar.Hour == hour && schedule.Calendar.Minute >= minute) ||
+			(schedule.Calendar.Hour > hour))
 }
