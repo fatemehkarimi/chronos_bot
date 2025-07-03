@@ -29,7 +29,7 @@ const (
 	// add feature flag
 	AddFeatureFlagState
 
-	// add schedule
+	// add scheduler
 	ChooseFeatureFlagState
 	ChooseCalendarTypeState
 	GetScheduleState
@@ -40,7 +40,7 @@ const (
 type UserState struct {
 	StateName State
 
-	// for schedule state
+	// for scheduler state
 	//SelectedFeatureFlag  *FeatureFlag
 	//SelectedCalendarType *Calendar
 	//FeatureFlagValue     *string
@@ -55,3 +55,8 @@ const (
 	GeorgianCalendar
 	QamariCalendar
 )
+
+type DayTime struct {
+	Hour   int
+	Minute int
+}

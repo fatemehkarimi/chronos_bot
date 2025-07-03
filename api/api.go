@@ -17,7 +17,13 @@ type BaleApi struct {
 	token string
 }
 
-func (api BaleApi) SendMessage(chatId string, text string, replyMarkUp entities.ReplyMarkup, ch chan<- entities.MethodResponse) {
+func NewBaleApi(token string) BaleApi {
+	return BaleApi{token}
+}
+
+func (api BaleApi) SendMessage(
+	chatId string, text string, replyMarkUp entities.ReplyMarkup, ch chan<- entities.MethodResponse,
+) {
 	requestStruct := entities.RequestSendMessage{
 		ChatId:      chatId,
 		Text:        text,
