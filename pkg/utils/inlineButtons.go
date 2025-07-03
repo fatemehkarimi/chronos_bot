@@ -22,10 +22,16 @@ func GetMainReplyMarkup() entities.ReplyMarkup {
 	replyMarkup := entities.InlineKeyboardMarkup{
 		InlineKeyboard: [][]entities.InlineKeyboardButton{
 			{
-				entities.InlineKeyboardButton{Text: "افزودن پرچم", CallbackData: &featureFlagCallbackData},
+				entities.InlineKeyboardButton{
+					Text:         "افزودن پرچم",
+					CallbackData: &featureFlagCallbackData,
+				},
 			},
 			{
-				entities.InlineKeyboardButton{Text: "افزودن برنامه زمانی", CallbackData: &scheduleCallbackData},
+				entities.InlineKeyboardButton{
+					Text:         "افزودن برنامه زمانی",
+					CallbackData: &scheduleCallbackData,
+				},
 			},
 		},
 	}
@@ -40,13 +46,22 @@ func GetScheduleReplyMarkup() entities.ReplyMarkup {
 	replyMarkup := entities.InlineKeyboardMarkup{
 		InlineKeyboard: [][]entities.InlineKeyboardButton{
 			{
-				entities.InlineKeyboardButton{Text: "خورشیدی", CallbackData: &khorshidiCalendarCallbackData},
+				entities.InlineKeyboardButton{
+					Text:         "خورشیدی",
+					CallbackData: &khorshidiCalendarCallbackData,
+				},
 			},
 			{
-				entities.InlineKeyboardButton{Text: "میلادی", CallbackData: &georgianCalendarCallbackData},
+				entities.InlineKeyboardButton{
+					Text:         "میلادی",
+					CallbackData: &georgianCalendarCallbackData,
+				},
 			},
 			{
-				entities.InlineKeyboardButton{Text: "قمری", CallbackData: &qamariCalendarCallbackData},
+				entities.InlineKeyboardButton{
+					Text:         "قمری",
+					CallbackData: &qamariCalendarCallbackData,
+				},
 			},
 		},
 	}
@@ -59,7 +74,10 @@ func GetReplyMarkupFromFeatureFlags(featureFlags []entities.FeatureFlag) entitie
 	for idx, featureFlag := range featureFlags {
 		callbackData := fmt.Sprintf("feature_flag %s", featureFlag.Name)
 		inlineKeyboard[idx] = []entities.InlineKeyboardButton{
-			entities.InlineKeyboardButton{Text: featureFlag.Name, CallbackData: &callbackData},
+			entities.InlineKeyboardButton{
+				Text:         featureFlag.Name,
+				CallbackData: &callbackData,
+			},
 		}
 	}
 	return entities.InlineKeyboardMarkup{
@@ -72,7 +90,10 @@ func GetUsersListCReplyMarkup() entities.ReplyMarkup {
 	replyMarkup := entities.InlineKeyboardMarkup{
 		InlineKeyboard: [][]entities.InlineKeyboardButton{
 			{
-				entities.InlineKeyboardButton{Text: "همه‌ی کاربران", CallbackData: &usersListCallbackData},
+				entities.InlineKeyboardButton{
+					Text:         "همه‌ی کاربران",
+					CallbackData: &usersListCallbackData,
+				},
 			},
 		},
 	}

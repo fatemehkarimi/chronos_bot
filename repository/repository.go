@@ -27,7 +27,11 @@ type Repository interface {
 	GetFeatureFlagByName(name string) (*entities.FeatureFlag, error)
 	GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error)
 	GetScheduleByTime(
-		calendarType entities.Calendar, year int, month int, day int, startTime entities.DayTime,
+		calendarType entities.Calendar,
+		year int,
+		month int,
+		day int,
+		startTime entities.DayTime,
 		endTime entities.DayTime,
 	) ([]entities.Schedule, error)
 }
@@ -73,13 +77,19 @@ func (repo *PostgresRepository) CreateTableSchedule() error {
 	return err
 }
 
-func (repo *PostgresRepository) AddFeatureFlag(ownerId int, featureFlag string) error {
+func (repo *PostgresRepository) AddFeatureFlag(
+	ownerId int,
+	featureFlag string,
+) error {
 	query := `INSERT INTO feature_flag(owner_id, feature_flag, unix_time) VALUES ($1, $2, $3);`
 	_, err := repo.DB.Exec(query, ownerId, featureFlag, time.Now().Unix())
 	return err
 }
 
-func (repo *PostgresRepository) AddSchedule(schedule entities.Schedule) (int, error) {
+func (repo *PostgresRepository) AddSchedule(schedule entities.Schedule) (
+	int,
+	error,
+) {
 	query := `
 	INSERT INTO schedule(
 	 	feature_flag,
@@ -119,13 +129,20 @@ func (repo *PostgresRepository) RemoveSchedule(scheduleId int) error {
 	return err
 }
 
-func (repo *PostgresRepository) GetFeatureFlagByName(name string) (*entities.FeatureFlag, error) {
+func (repo *PostgresRepository) GetFeatureFlagByName(name string) (
+	*entities.FeatureFlag,
+	error,
+) {
 	query := `
 	SELECT feature_flag, owner_id, unix_time FROM feature_flag WHERE feature_flag=$1;
 	`
 
 	var featureFlag entities.FeatureFlag
-	err := repo.DB.QueryRow(query, name).Scan(&featureFlag.Name, &featureFlag.OwnerId, &featureFlag.UnixTime)
+	err := repo.DB.QueryRow(query, name).Scan(
+		&featureFlag.Name,
+		&featureFlag.OwnerId,
+		&featureFlag.UnixTime,
+	)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -136,7 +153,10 @@ func (repo *PostgresRepository) GetFeatureFlagByName(name string) (*entities.Fea
 	return &featureFlag, nil
 }
 
-func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error) {
+func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) (
+	[]entities.FeatureFlag,
+	error,
+) {
 	query := `
 	SELECT feature_flag, owner_id, unix_time FROM feature_flag WHERE owner_id=$1;
 	`
@@ -155,7 +175,11 @@ func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) ([]entitie
 
 	var featureFlag entities.FeatureFlag
 	for rows.Next() {
-		err := rows.Scan(&featureFlag.Name, &featureFlag.OwnerId, &featureFlag.UnixTime)
+		err := rows.Scan(
+			&featureFlag.Name,
+			&featureFlag.OwnerId,
+			&featureFlag.UnixTime,
+		)
 		if err != nil {
 			// todo: this is not really correct
 			return featureFlags, err
@@ -166,7 +190,12 @@ func (repo *PostgresRepository) GetFeatureFlagsByOwnerId(ownerId int) ([]entitie
 }
 
 func (repo *PostgresRepository) GetScheduleByTime(
-	calendarType entities.Calendar, year int, month int, day int, startTime entities.DayTime, endTime entities.DayTime,
+	calendarType entities.Calendar,
+	year int,
+	month int,
+	day int,
+	startTime entities.DayTime,
+	endTime entities.DayTime,
 ) ([]entities.Schedule, error) {
 	query := `
 	SELECT schedule_id, feature_flag, value, calendar_type, users_list, year, month, day, hour, minute, unix_time
@@ -185,7 +214,15 @@ func (repo *PostgresRepository) GetScheduleByTime(
 
 	var schedules []entities.Schedule
 	rows, err := repo.DB.Query(
-		query, calendarType, day, year, month, startTime.Hour, startTime.Minute, endTime.Hour, endTime.Minute,
+		query,
+		calendarType,
+		day,
+		year,
+		month,
+		startTime.Hour,
+		startTime.Minute,
+		endTime.Hour,
+		endTime.Minute,
 	)
 	defer func(rows *sql.Rows) {
 		err := rows.Close()
@@ -201,8 +238,16 @@ func (repo *PostgresRepository) GetScheduleByTime(
 	var schedule entities.Schedule
 	for rows.Next() {
 		err := rows.Scan(
-			&schedule.ScheduleId, &schedule.FeatureFlagName, &schedule.Value, &schedule.CalendarType,
-			&schedule.UsersList, &schedule.Year, &schedule.Month, &schedule.Day, &schedule.Hour, &schedule.Minute,
+			&schedule.ScheduleId,
+			&schedule.FeatureFlagName,
+			&schedule.Value,
+			&schedule.CalendarType,
+			&schedule.UsersList,
+			&schedule.Year,
+			&schedule.Month,
+			&schedule.Day,
+			&schedule.Hour,
+			&schedule.Minute,
 			&schedule.UnixTime,
 		)
 

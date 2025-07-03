@@ -10,7 +10,12 @@ import (
 )
 
 type Api interface {
-	SendMessage(chatId string, text string, replyMarkUp entities.ReplyMarkup, ch chan<- entities.MethodResponse)
+	SendMessage(
+		chatId string,
+		text string,
+		replyMarkUp entities.ReplyMarkup,
+		ch chan<- entities.MethodResponse,
+	)
 }
 
 type BaleApi struct {
@@ -22,7 +27,10 @@ func NewBaleApi(token string) BaleApi {
 }
 
 func (api BaleApi) SendMessage(
-	chatId string, text string, replyMarkUp entities.ReplyMarkup, ch chan<- entities.MethodResponse,
+	chatId string,
+	text string,
+	replyMarkUp entities.ReplyMarkup,
+	ch chan<- entities.MethodResponse,
 ) {
 	requestStruct := entities.RequestSendMessage{
 		ChatId:      chatId,

@@ -10,7 +10,11 @@ import (
 )
 
 type Scheduler interface {
-	LaunchSchedulesInRange(calendar entities.Calendar, startDayTime entities.DayTime, endDayTime entities.DayTime)
+	LaunchSchedulesInRange(
+		calendar entities.Calendar,
+		startDayTime entities.DayTime,
+		endDayTime entities.DayTime,
+	)
 	OnNewSchedule(schedule entities.Schedule)
 }
 
@@ -20,19 +24,32 @@ type DBScheduler struct {
 	logChannel string
 }
 
-func NewScheduler(DB repository.Repository, api api.Api, logChannel string) Scheduler {
+func NewScheduler(
+	DB repository.Repository,
+	api api.Api,
+	logChannel string,
+) Scheduler {
 	return DBScheduler{DB, api, logChannel}
 }
 
 func (s DBScheduler) LaunchSchedulesInRange(
-	calendar entities.Calendar, startDayTime entities.DayTime, endDayTime entities.DayTime,
+	calendar entities.Calendar,
+	startDayTime entities.DayTime,
+	endDayTime entities.DayTime,
 ) {
 	now := time.Now()
 	year := now.Year()
 	month := int(now.Month())
 	day := now.Day()
 
-	schedules, err := s.repo.GetScheduleByTime(entities.GeorgianCalendar, year, month, day, startDayTime, endDayTime)
+	schedules, err := s.repo.GetScheduleByTime(
+		entities.GeorgianCalendar,
+		year,
+		month,
+		day,
+		startDayTime,
+		endDayTime,
+	)
 
 	if err != nil {
 		slog.Error("error getting schedules", slog.Any("error", err))
@@ -53,10 +70,18 @@ func (s DBScheduler) OnNewSchedule(schedule entities.Schedule) {
 }
 
 func (s DBScheduler) ScheduleAndNotify(schedule entities.Schedule) {
-	taskDayTime := entities.DayTime{Hour: schedule.Hour, Minute: schedule.Minute}
+	taskDayTime := entities.DayTime{
+		Hour:   schedule.Hour,
+		Minute: schedule.Minute,
+	}
 	task := func() error {
 		SetConfig(schedule)
-		s.api.SendMessage(s.logChannel, utils.ScheduleToText(schedule), nil, nil)
+		s.api.SendMessage(
+			s.logChannel,
+			utils.ScheduleToText(schedule),
+			nil,
+			nil,
+		)
 		return nil
 	}
 	err := utils.ScheduleTaskOnSameDay(taskDayTime, task)

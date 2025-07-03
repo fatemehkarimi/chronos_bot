@@ -82,7 +82,11 @@ func main() {
 	}
 
 	baleApi := api.NewBaleApi(config.BotToken)
-	awxScheduler := scheduler.NewScheduler(&postgresRepo, baleApi, config.LogChannel)
+	awxScheduler := scheduler.NewScheduler(
+		&postgresRepo,
+		baleApi,
+		config.LogChannel,
+	)
 	httpHandler := handler.NewHttpHandler(&postgresRepo, baleApi, awxScheduler)
 
 	mux := http.NewServeMux()
@@ -132,7 +136,11 @@ func checkForUpdates(botToken string, handler handler.Handler) {
 			timeout,
 		)
 
-		req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(requestBytes))
+		req, err := http.NewRequest(
+			"POST",
+			endpoint,
+			bytes.NewBuffer(requestBytes),
+		)
 
 		if err != nil {
 			slog.Error("error creating new request", slog.Any("error", err))
@@ -145,7 +153,10 @@ func checkForUpdates(botToken string, handler handler.Handler) {
 			slog.Error("error creating sending request", slog.Any("error", err))
 			continue
 		}
-		slog.Info("getUpdates response from tapi", slog.Int("status", res.StatusCode))
+		slog.Info(
+			"getUpdates response from tapi",
+			slog.Int("status", res.StatusCode),
+		)
 
 		updateResponse := entities.ResponseGetUpdates{}
 		err = json.NewDecoder(res.Body).Decode(&updateResponse)
@@ -162,7 +173,11 @@ func checkForUpdates(botToken string, handler handler.Handler) {
 				slog.Error("error marshaling request", slog.Any("error", err))
 			}
 
-			req, err := http.NewRequest("POST", "http://localhost:8080/getUpdates", bytes.NewBuffer(requestBytes))
+			req, err := http.NewRequest(
+				"POST",
+				"http://localhost:8080/getUpdates",
+				bytes.NewBuffer(requestBytes),
+			)
 
 			if err != nil {
 				slog.Error("error creating new request", slog.Any("error", err))
@@ -172,7 +187,10 @@ func checkForUpdates(botToken string, handler handler.Handler) {
 			res, err := client.Do(req)
 
 			if err != nil {
-				slog.Error("error creating sending request", slog.Any("error", err))
+				slog.Error(
+					"error creating sending request",
+					slog.Any("error", err),
+				)
 				continue
 			}
 

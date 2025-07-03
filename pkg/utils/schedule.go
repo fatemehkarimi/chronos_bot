@@ -70,7 +70,16 @@ func ParseSchedulePattern(pattern string) (*entities.Schedule, error) {
 
 func ScheduleTaskOnSameDay(dayTime entities.DayTime, task func() error) error {
 	now := time.Now()
-	scheduleTime := time.Date(now.Year(), now.Month(), now.Day(), dayTime.Hour, dayTime.Minute, 0, 0, now.Location())
+	scheduleTime := time.Date(
+		now.Year(),
+		now.Month(),
+		now.Day(),
+		dayTime.Hour,
+		dayTime.Minute,
+		0,
+		0,
+		now.Location(),
+	)
 	diff := scheduleTime.Sub(now)
 
 	timer := time.NewTimer(diff)
@@ -86,7 +95,12 @@ func ScheduleToText(schedule entities.Schedule) string {
 گروه کاربران: %s
 مقدار: %s
 `
-	return fmt.Sprintf(template, schedule.FeatureFlagName, schedule.UsersList, schedule.Value)
+	return fmt.Sprintf(
+		template,
+		schedule.FeatureFlagName,
+		schedule.UsersList,
+		schedule.Value,
+	)
 }
 
 func ShouldRunToday(schedule entities.Schedule) bool {
