@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"github.com/fatemehkarimi/chronos_bot/handler"
 	"github.com/fatemehkarimi/chronos_bot/scheduler"
 	"log/slog"
 	"net/http"
@@ -39,6 +40,7 @@ func LoadConfig() (Config, error) {
 }
 
 func main() {
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 	config, err := LoadConfig()
 	if err != nil {
 		os.Exit(-1)
@@ -79,7 +81,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	httpHandler := api.NewHttpHandler(&postgresRepo, config.BotToken)
+	baleApi := api.NewBaleApi(config.BotToken)
+	awxScheduler := scheduler.NewScheduler(&postgresRepo, baleApi, config.LogChannel)
+	httpHandler := handler.NewHttpHandler(&postgresRepo, baleApi, awxScheduler)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/getUpdates", httpHandler.GetUpdates)
@@ -91,9 +95,6 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-
-	baleApi := api.NewBaleApi(config.BotToken)
-	awxScheduler := scheduler.NewScheduler(&postgresRepo, baleApi, config.LogChannel)
 
 	go awxScheduler.LaunchSchedulesInRange(
 		entities.GeorgianCalendar,
@@ -108,7 +109,7 @@ func main() {
 	}
 }
 
-func checkForUpdates(botToken string, handler api.Handler) {
+func checkForUpdates(botToken string, handler handler.Handler) {
 	client := &http.Client{}
 	for {
 		time.Sleep(5 * time.Second)
