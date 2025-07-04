@@ -87,6 +87,8 @@ func main() {
 		baleApi,
 		config.LogChannel,
 	)
+	go RunDailyJob(awxScheduler)
+
 	httpHandler := handler.NewHttpHandler(&postgresRepo, baleApi, awxScheduler)
 
 	mux := http.NewServeMux()
@@ -99,24 +101,6 @@ func main() {
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-
-	go awxScheduler.LaunchSchedulesInRange(
-		entities.GeorgianCalendar{},
-		entities.CalendarTime{
-			Hour:   time.Now().Hour(),
-			Minute: time.Now().Minute(),
-		},
-		entities.CalendarTime{Hour: 23, Minute: 0},
-	)
-
-	go awxScheduler.LaunchSchedulesInRange(
-		entities.KhorshidiCalendar{},
-		entities.CalendarTime{
-			Hour:   time.Now().Hour(),
-			Minute: time.Now().Minute(),
-		},
-		entities.CalendarTime{Hour: 23, Minute: 59},
-	)
 
 	go checkForUpdates(config.BotToken, httpHandler)
 	err = server.ListenAndServe()
@@ -210,4 +194,54 @@ func checkForUpdates(botToken string, handler handler.Handler) {
 
 		}
 	}
+}
+
+func RunDailyJob(scheduler scheduler.Scheduler) {
+	now := time.Now()
+	startTime := entities.CalendarTime{Hour: now.Hour(), Minute: now.Minute()}
+	endTime := entities.CalendarTime{Hour: 23, Minute: 59}
+	for {
+		err := LunchDailyScheduler(scheduler, startTime, endTime)
+		if err != nil {
+			slog.Error("error running daily job", slog.Any("error", err))
+		}
+
+		todayMidnight := time.Date(
+			now.Year(),
+			now.Month(),
+			now.Day(),
+			0,
+			0,
+			0,
+			0,
+			now.Location(),
+		)
+		tomorrowMidnight := todayMidnight.AddDate(0, 0, 1)
+		duration := tomorrowMidnight.Sub(now)
+
+		time.Sleep(duration)
+		now = time.Now()
+		startTime.Hour = 0
+		startTime.Minute = 0
+	}
+
+}
+
+func LunchDailyScheduler(
+	scheduler scheduler.Scheduler,
+	startTime, endTime entities.CalendarTime,
+) error {
+	go scheduler.LaunchSchedulesInRange(
+		entities.GeorgianCalendar{},
+		startTime,
+		endTime,
+	)
+
+	go scheduler.LaunchSchedulesInRange(
+		entities.KhorshidiCalendar{},
+		startTime,
+		endTime,
+	)
+
+	return nil
 }

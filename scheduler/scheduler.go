@@ -42,7 +42,7 @@ func (s DBScheduler) LaunchSchedulesInRange(
 	day := now.Day
 
 	schedules, err := s.repo.GetScheduleByTime(
-		entities.GeorgianCalendarType,
+		calendar.Type(),
 		year,
 		month,
 		day,
