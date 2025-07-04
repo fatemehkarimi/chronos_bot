@@ -3,12 +3,13 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	api "github.com/fatemehkarimi/chronos_bot/api"
-	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
-	"github.com/fatemehkarimi/chronos_bot/scheduler"
 	"log/slog"
 	"net/http"
 	"strings"
+
+	api "github.com/fatemehkarimi/chronos_bot/api"
+	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
+	"github.com/fatemehkarimi/chronos_bot/scheduler"
 
 	"github.com/fatemehkarimi/chronos_bot/entities"
 	"github.com/fatemehkarimi/chronos_bot/repository"
@@ -183,6 +184,8 @@ func (h *HttpHandler) HandleCallbackQueryUpdate(
 			callbackQuery.From.Id,
 			entities.Message{Text: &value},
 		)
+	case *data == utils.ViewFeatureFlagsCallbackData:
+		h.HandleViewFeatureFlags(updateId, callbackQuery.From.Id)
 	default:
 		slog.Info("unknown callback query data", slog.String("data", *data))
 	}
@@ -570,4 +573,37 @@ func (h *HttpHandler) HandleUsersList(
 
 		h.scheduler.OnNewSchedule(*schedule)
 	}
+}
+
+func (h *HttpHandler) HandleViewFeatureFlags(updateId, chatId int) {
+	featureFlags, err := h.db.GetFeatureFlagsByOwnerId(chatId)
+	if err != nil {
+		slog.Error("error getting feature flags", slog.Any("error", err))
+		h.SendContactDeveloperErrorMessage(updateId, chatId)
+		return
+	}
+
+	if len(featureFlags) == 0 {
+		replyMarkup := utils.GetMainReplyMarkup()
+		go h.api.SendMessage(
+			fmt.Sprint(chatId),
+			"شما هیچ پرچمی ثبت نکرده‌اید.",
+			replyMarkup,
+			nil,
+		)
+		return
+	}
+
+	var flagList strings.Builder
+	flagList.WriteString("پرچم‌های شما:\n")
+	for i, flag := range featureFlags {
+		flagList.WriteString(fmt.Sprintf("%d. %s\n", i+1, flag.Name))
+	}
+	replyMarkup := utils.GetMainReplyMarkup()
+	go h.api.SendMessage(
+		fmt.Sprint(chatId),
+		flagList.String(),
+		replyMarkup,
+		nil,
+	)
 }

@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+
 	"github.com/fatemehkarimi/chronos_bot/entities"
 )
 
@@ -14,13 +15,22 @@ const (
 	QamariCalendarCallbackData    = "qamari calendar"
 
 	UsersListForAllCallbackData = "usersList for all"
+
+	ViewFeatureFlagsCallbackData = "view feature_flags"
 )
 
 func GetMainReplyMarkup() entities.ReplyMarkup {
 	scheduleCallbackData := AddScheduleCallbackData
 	featureFlagCallbackData := AddFeatureFlagCallbackData
+	viewFeatureFlagsCallbackData := ViewFeatureFlagsCallbackData
 	replyMarkup := entities.InlineKeyboardMarkup{
 		InlineKeyboard: [][]entities.InlineKeyboardButton{
+			{
+				entities.InlineKeyboardButton{
+					Text:         "دیدن پرچم‌ها",
+					CallbackData: &viewFeatureFlagsCallbackData,
+				},
+			},
 			{
 				entities.InlineKeyboardButton{
 					Text:         "افزودن پرچم",

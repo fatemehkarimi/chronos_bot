@@ -3,9 +3,10 @@ package repository
 import (
 	"database/sql"
 	"errors"
-	"github.com/fatemehkarimi/chronos_bot/entities"
 	"log"
 	"time"
+
+	"github.com/fatemehkarimi/chronos_bot/entities"
 )
 
 type DatabaseConfig struct {
@@ -62,7 +63,7 @@ func (repo *PostgresRepository) CreateTableSchedule() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS schedule(
 		schedule_id SERIAL PRIMARY KEY,
-		feature_flag VARCHAR REFERENCES feature_flag(feature_flag),
+		feature_flag VARCHAR REFERENCES feature_flag(feature_flag) ON DELETE CASCADE,
 		value TEXT,
 		calendar_type SMALLINT,
 	    users_list TEXT,
@@ -72,7 +73,7 @@ func (repo *PostgresRepository) CreateTableSchedule() error {
 		hour INT,
 		minute INT,
 		unix_time BIGINT
-);`
+	);`
 	_, err := repo.DB.Exec(query)
 	return err
 }
