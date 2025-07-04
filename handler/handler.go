@@ -3,12 +3,13 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	api "github.com/fatemehkarimi/chronos_bot/api"
-	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
-	"github.com/fatemehkarimi/chronos_bot/scheduler"
 	"log/slog"
 	"net/http"
 	"strings"
+
+	api "github.com/fatemehkarimi/chronos_bot/api"
+	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
+	"github.com/fatemehkarimi/chronos_bot/scheduler"
 
 	"github.com/fatemehkarimi/chronos_bot/entities"
 	"github.com/fatemehkarimi/chronos_bot/repository"
@@ -37,7 +38,7 @@ func NewHttpHandler(
 		db:         db,
 		api:        Api,
 		userStates: map[string]entities.UserState{},
-		updateId:   57,
+		updateId:   517,
 		scheduler:  scheduler,
 	}
 }
@@ -175,7 +176,12 @@ func (h *HttpHandler) HandleCallbackQueryUpdate(
 			utils.CallbackDataToCalendarType(*data),
 		)
 	case strings.HasPrefix(*data, "feature_flag"):
-		h.HandleChooseFeatureFlag(updateId, callbackQuery.From.Id, *data)
+		userState := h.userStates[fmt.Sprint(callbackQuery.From.Id)]
+		if userState.StateName == entities.ChooseFeatureFlagState {
+			h.HandleChooseFeatureFlag(updateId, callbackQuery.From.Id, *data)
+		} else {
+			h.HandleDeleteFeatureFlag(updateId, callbackQuery.From.Id, *data)
+		}
 	case *data == utils.UsersListForAllCallbackData:
 		value := "*"
 		h.HandleUsersList(
@@ -183,6 +189,10 @@ func (h *HttpHandler) HandleCallbackQueryUpdate(
 			callbackQuery.From.Id,
 			entities.Message{Text: &value},
 		)
+	case *data == utils.ViewFeatureFlagsCallbackData:
+		h.HandleViewFeatureFlags(updateId, callbackQuery.From.Id)
+	case *data == utils.DeleteFeatureFlagCallbakData:
+		h.HandleDeleteFeatureFlagCallbackData(updateId, callbackQuery.From.Id)
 	default:
 		slog.Info("unknown callback query data", slog.String("data", *data))
 	}
@@ -425,10 +435,7 @@ func (h *HttpHandler) HandleChooseFeatureFlag(
 	updateId, chatId int,
 	featureFlagCallbackData string,
 ) {
-	featureFlagName := strings.TrimPrefix(
-		featureFlagCallbackData,
-		"feature_flag ",
-	)
+	featureFlagName := utils.GetFeatureFlagNameFromCallbackData(featureFlagCallbackData)
 	userState := h.userStates[fmt.Sprint(chatId)]
 
 	if userState.StateName != entities.ChooseFeatureFlagState {
@@ -570,4 +577,120 @@ func (h *HttpHandler) HandleUsersList(
 
 		h.scheduler.OnNewSchedule(*schedule)
 	}
+}
+
+func (h *HttpHandler) HandleViewFeatureFlags(updateId, chatId int) {
+	featureFlags, err := h.db.GetFeatureFlagsByOwnerId(chatId)
+	if err != nil {
+		slog.Error("error getting feature flags", slog.Any("error", err))
+		h.SendContactDeveloperErrorMessage(updateId, chatId)
+		return
+	}
+
+	if len(featureFlags) == 0 {
+		replyMarkup := utils.GetMainReplyMarkup()
+		go h.api.SendMessage(
+			fmt.Sprint(chatId),
+			"شما هیچ پرچمی ثبت نکرده‌اید.",
+			replyMarkup,
+			nil,
+		)
+		return
+	}
+
+	var flagList strings.Builder
+	flagList.WriteString("پرچم‌های شما:\n")
+	for i, flag := range featureFlags {
+		flagList.WriteString(fmt.Sprintf("%d. %s\n", i+1, flag.Name))
+	}
+	replyMarkup := utils.GetMainReplyMarkup()
+	go h.api.SendMessage(
+		fmt.Sprint(chatId),
+		flagList.String(),
+		replyMarkup,
+		nil,
+	)
+}
+
+func (h *HttpHandler) HandleDeleteFeatureFlagCallbackData(updateId, chatId int) {
+	featureFlags, err := h.db.GetFeatureFlagsByOwnerId(chatId)
+	if err != nil {
+		slog.Error("error getting feature flags", slog.Any("error", err))
+		h.SendContactDeveloperErrorMessage(updateId, chatId)
+		return
+	}
+
+	if len(featureFlags) == 0 {
+		replyMarkup := utils.GetMainReplyMarkup()
+		go h.api.SendMessage(
+			fmt.Sprint(chatId),
+			"پرچمی برای شما ثبت نشده است تا ان را پاک کنید.",
+			replyMarkup,
+			nil,
+		)
+		h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.StartState}
+		return
+	}
+
+	chMessage := make(chan entities.MethodResponse)
+	replyMarkup := utils.GetReplyMarkupFromFeatureFlags(featureFlags)
+
+	go h.api.SendMessage(
+		fmt.Sprint(chatId),
+		"کدام پرچم را می‌خواهید حذف کنید؟",
+		replyMarkup,
+		chMessage,
+	)
+
+	result := <-chMessage
+	if result.Err != nil {
+		slog.Error(
+			"error sending select feature flag to delete. err = ",
+			slog.Int("updateId", updateId),
+			slog.Int("chatId", chatId),
+			slog.Any("err", result.Err),
+		)
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	} else {
+		h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.DeleteFeatureFlagState}
+	}
+}
+
+func (h *HttpHandler) HandleDeleteFeatureFlag(
+	updateId, chatId int,
+	featureFlagCallbackData string,
+) {
+	featureFlagName := utils.GetFeatureFlagNameFromCallbackData(featureFlagCallbackData)
+	userState := h.userStates[fmt.Sprint(chatId)]
+
+	if userState.StateName != entities.DeleteFeatureFlagState {
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	}
+
+	err := h.db.RemoveFeatureFlag(featureFlagName)
+	if err != nil {
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	}
+	replyMarkup := utils.GetMainReplyMarkup()
+
+	ch := make(chan entities.MethodResponse)
+	go h.api.SendMessage(
+		fmt.Sprint(chatId),
+		fmt.Sprintf("پرچم %s پاک شد.", featureFlagName),
+		replyMarkup,
+		ch,
+	)
+	result := <-ch
+	if result.Err != nil {
+		slog.Error(
+			"error sending success delete feature flag. err = ",
+			slog.Int("updateId", updateId),
+			slog.Int("chatId", chatId),
+			slog.Any("err", result.Err),
+		)
+	}
+	h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.StartState}
 }

@@ -24,6 +24,9 @@ const (
 	// add feature flag
 	AddFeatureFlagState
 
+	// delete feature flag
+	DeleteFeatureFlagState
+
 	// add scheduler
 	ChooseFeatureFlagState
 	ChooseCalendarTypeState
