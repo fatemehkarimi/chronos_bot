@@ -603,13 +603,22 @@ func (h *HttpHandler) HandleViewFeatureFlags(updateId, chatId int) {
 	for i, flag := range featureFlags {
 		flagList.WriteString(fmt.Sprintf("%d. %s\n", i+1, flag.Name))
 	}
+
+	ch := make(chan entities.MethodResponse)
 	replyMarkup := utils.GetMainReplyMarkup()
 	go h.api.SendMessage(
 		fmt.Sprint(chatId),
 		flagList.String(),
 		replyMarkup,
-		nil,
+		ch,
 	)
+
+	result := <-ch
+	if result.Err != nil {
+		slog.Error("error sending feature flags", slog.Any("error", result.Err))
+		h.ResetUserStateAndSendResetMessage(chatId)
+		return
+	}
 }
 
 func (h *HttpHandler) HandleDeleteFeatureFlagCallbackData(updateId, chatId int) {
