@@ -24,6 +24,7 @@ type Repository interface {
 	CreateTableSchedule() error
 	AddFeatureFlag(ownerId int, featureFlag string) error
 	AddSchedule(schedule entities.Schedule) (int, error)
+	RemoveFeatureFlag(featureFlag string) error
 	RemoveSchedule(scheduleId int) error
 	GetFeatureFlagByName(name string) (*entities.FeatureFlag, error)
 	GetFeatureFlagsByOwnerId(ownerId int) ([]entities.FeatureFlag, error)
@@ -261,6 +262,14 @@ func (repo *PostgresRepository) GetScheduleByTime(
 	}
 
 	return schedules, nil
+}
+
+func (repo *PostgresRepository) RemoveFeatureFlag(featureFlag string) error {
+	query := `
+	DELETE FROM feature_flag WHERE feature_flag=$1;
+	`
+	_, err := repo.DB.Exec(query, featureFlag)
+	return err
 }
 
 func (repo *PostgresRepository) Init() error {

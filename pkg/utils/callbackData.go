@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/fatemehkarimi/chronos_bot/entities"
+	"strings"
 )
 
 func CallbackDataToCalendarType(data string) entities.CalendarType {
@@ -13,4 +14,12 @@ func CallbackDataToCalendarType(data string) entities.CalendarType {
 	default:
 		return entities.KhorshidiCalendarType
 	}
+}
+
+func GetFeatureFlagNameFromCallbackData(data string) string {
+	featureFlagName := strings.TrimPrefix(
+		data,
+		"feature_flag ",
+	)
+	return featureFlagName
 }

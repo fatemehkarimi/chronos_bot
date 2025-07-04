@@ -17,12 +17,15 @@ const (
 	UsersListForAllCallbackData = "usersList for all"
 
 	ViewFeatureFlagsCallbackData = "view feature_flags"
+	DeleteFeatureFlagCallbakData = "delete feature_flag"
 )
 
 func GetMainReplyMarkup() entities.ReplyMarkup {
 	scheduleCallbackData := AddScheduleCallbackData
 	featureFlagCallbackData := AddFeatureFlagCallbackData
 	viewFeatureFlagsCallbackData := ViewFeatureFlagsCallbackData
+	deleteFeatureFlagCallbackData := DeleteFeatureFlagCallbakData
+
 	replyMarkup := entities.InlineKeyboardMarkup{
 		InlineKeyboard: [][]entities.InlineKeyboardButton{
 			{
@@ -35,6 +38,12 @@ func GetMainReplyMarkup() entities.ReplyMarkup {
 				entities.InlineKeyboardButton{
 					Text:         "افزودن پرچم",
 					CallbackData: &featureFlagCallbackData,
+				},
+			},
+			{
+				entities.InlineKeyboardButton{
+					Text:         "پاک کردن پرچم",
+					CallbackData: &deleteFeatureFlagCallbackData,
 				},
 			},
 			{
