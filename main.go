@@ -131,52 +131,16 @@ func checkForUpdates(botToken string, handler handler.Handler) {
 			timeout,
 		)
 
-		req, err := http.NewRequest(
-			"POST",
-			endpoint,
-			bytes.NewBuffer(requestBytes),
-		)
-
-		if err != nil {
-			slog.Error("error creating new request", slog.Any("error", err))
-			continue
-		}
-
-		res, err := client.Do(req)
-
-		if err != nil {
-			slog.Error("error creating sending request", slog.Any("error", err))
-			continue
-		}
-		slog.Info(
-			"getUpdates response from tapi",
-			slog.Int("status", res.StatusCode),
-		)
-
-		updateResponse := entities.ResponseGetUpdates{}
-		err = json.NewDecoder(res.Body).Decode(&updateResponse)
-		if err != nil {
-			slog.Error("error parsing response", slog.Any("error", err))
-			continue
-		}
-
-		// sending updates
-		for _, update := range updateResponse.Result {
-			requestBytes, err := json.MarshalIndent(update, "", "  ")
-
-			if err != nil {
-				slog.Error("error marshaling request", slog.Any("error", err))
-			}
-
+		go func() {
 			req, err := http.NewRequest(
 				"POST",
-				"http://localhost:8080/getUpdates",
+				endpoint,
 				bytes.NewBuffer(requestBytes),
 			)
 
 			if err != nil {
 				slog.Error("error creating new request", slog.Any("error", err))
-				continue
+				return
 			}
 
 			res, err := client.Do(req)
@@ -186,12 +150,63 @@ func checkForUpdates(botToken string, handler handler.Handler) {
 					"error creating sending request",
 					slog.Any("error", err),
 				)
-				continue
+				return
+			}
+			slog.Info(
+				"getUpdates response from tapi",
+				slog.Int("status", res.StatusCode),
+			)
+
+			updateResponse := entities.ResponseGetUpdates{}
+			err = json.NewDecoder(res.Body).Decode(&updateResponse)
+			if err != nil {
+				slog.Error("error parsing response", slog.Any("error", err))
+				return
 			}
 
-			slog.Info("getUpdates response", slog.Int("status", res.StatusCode))
+			// sending updates
+			for _, update := range updateResponse.Result {
+				requestBytes, err := json.MarshalIndent(update, "", "  ")
 
-		}
+				if err != nil {
+					slog.Error(
+						"error marshaling request",
+						slog.Any("error", err),
+					)
+				}
+
+				req, err := http.NewRequest(
+					"POST",
+					"http://localhost:8080/getUpdates",
+					bytes.NewBuffer(requestBytes),
+				)
+
+				if err != nil {
+					slog.Error(
+						"error creating new request",
+						slog.Any("error", err),
+					)
+					continue
+				}
+
+				res, err := client.Do(req)
+
+				if err != nil {
+					slog.Error(
+						"error creating sending request",
+						slog.Any("error", err),
+					)
+					continue
+				}
+
+				slog.Info(
+					"getUpdates response",
+					slog.Int("status", res.StatusCode),
+				)
+
+			}
+		}()
+
 	}
 }
 
