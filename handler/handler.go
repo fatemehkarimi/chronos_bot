@@ -94,32 +94,26 @@ func (h *HttpHandler) HandleMessageUpdate(
 			"%d",
 			chatId,
 		)] = entities.UserState{StateName: entities.StartState}
-		ch := make(chan entities.MethodResponse)
 
 		replyMarkup := utils.GetMainReplyMarkup()
-		go h.api.SendMessage(
+		result := h.api.SendMessage(
 			fmt.Sprint(chatId),
 			"سلام!\nچه کاری را می خواهید به من بسپارید؟",
 			replyMarkup,
-			ch,
 		)
-
-		result := <-ch
 
 		if result.Err != nil {
 			fmt.Println("failed to send response", result.Err)
 
-			chFailed := make(chan entities.MethodResponse)
 			slog.Error(
 				"error handling /start command. err = ",
 				slog.Int64("chatId", chatId),
 				slog.Any("err", result.Err),
 			)
-			go h.api.SendMessage(
+			h.api.SendMessage(
 				fmt.Sprint(chatId),
 				"خطایی رخ داده است. لطفا دوباره /start را بفرستید",
 				nil,
-				chFailed,
 			)
 			return
 		} else {
@@ -199,15 +193,12 @@ func (h *HttpHandler) HandleCallbackQueryUpdate(
 }
 
 func (h *HttpHandler) HandleAddFeatureFlagCallbackData(updateId, chatId int) {
-	ch := make(chan entities.MethodResponse)
-	go h.api.SendMessage(
+	result := h.api.SendMessage(
 		fmt.Sprint(chatId),
 		"نام پرچم(feature flag) را بنویسید.",
 		nil,
-		ch,
 	)
 
-	result := <-ch
 	if result.Err != nil {
 		slog.Error(
 			"error handling /start command. err = ",
@@ -216,9 +207,9 @@ func (h *HttpHandler) HandleAddFeatureFlagCallbackData(updateId, chatId int) {
 		)
 		h.ResetUserStateAndSendResetMessage(chatId)
 		return
-	} else {
-		h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.AddFeatureFlagState}
 	}
+
+	h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.AddFeatureFlagState}
 }
 
 func (h *HttpHandler) HandleAddScheduleCallbackData(updateId int, chatId int) {
@@ -235,9 +226,7 @@ func (h *HttpHandler) AddFeatureFlag(
 	if value != "" {
 		// because chatId is private, casting is fine
 		err := h.db.AddFeatureFlag(int(chatId), value)
-		chMessage := make(chan entities.MethodResponse)
 		if err != nil {
-			replyMarkup := utils.GetMainReplyMarkup()
 			if pgErr, ok := err.(*pq.Error); ok {
 				if pgErr.Code == "23505" && pgErr.Constraint == "feature_flag_pkey" {
 					slog.Error(
@@ -259,14 +248,12 @@ func (h *HttpHandler) AddFeatureFlag(
 					if featureFlag.OwnerId == int(chatId) {
 						text = "این پرچم قبلا به نام شما ثبت شده است."
 					}
-					go h.api.SendMessage(
+					result := h.api.SendMessage(
 						fmt.Sprint(chatId),
 						text,
-						replyMarkup,
-						chMessage,
+						utils.GetMainReplyMarkup(),
 					)
 
-					result := <-chMessage
 					if result.Err != nil {
 						slog.Error(
 							"faild to notify user for duplicate response",
@@ -281,14 +268,12 @@ func (h *HttpHandler) AddFeatureFlag(
 				h.SendContactDeveloperErrorMessage(updateId, int(chatId))
 			}
 		} else {
-			go h.api.SendMessage(
+			result := h.api.SendMessage(
 				fmt.Sprint(chatId),
 				"پرچم شما ثبت شد. اکنون می‌توانید برنامه زمانی برای آن تعریف کنید.",
 				utils.GetMainReplyMarkup(),
-				chMessage,
 			)
 
-			result := <-chMessage
 			if result.Err != nil {
 				slog.Error(
 					"unknown error occurred adding new feature flag",
@@ -312,27 +297,22 @@ func (h *HttpHandler) HandleSendUserFeatureFlags(updateId, chatId int) {
 	}
 
 	if len(featureFlags) == 0 {
-		replyMarkup := utils.GetMainReplyMarkup()
-		go h.api.SendMessage(
+		h.api.SendMessage(
 			fmt.Sprint(chatId),
 			"پرچمی به نام شما ثبت نشده است. پرچم را ثبت کنید تا بتوانید برنامه زمانی برای آن تنظیم کنید.",
-			replyMarkup,
-			nil,
+			utils.GetMainReplyMarkup(),
 		)
 		h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.StartState}
 		return
 	}
 
-	chMessage := make(chan entities.MethodResponse)
 	replyMarkup := utils.GetReplyMarkupFromFeatureFlags(featureFlags)
-	go h.api.SendMessage(
+	result := h.api.SendMessage(
 		fmt.Sprint(chatId),
 		"پرچم را انتخاب کنید.",
 		replyMarkup,
-		chMessage,
 	)
 
-	result := <-chMessage
 	if result.Err != nil {
 		slog.Error(
 			"failed to send feature flags to user",
@@ -372,9 +352,7 @@ func (h *HttpHandler) HandleCalendarTypeCallbackData(
 	}
 
 	userState.StateName = entities.GetScheduleState
-	chMessage := make(chan entities.MethodResponse)
-
-	go h.api.SendMessage(
+	result := h.api.SendMessage(
 		fmt.Sprint(chatId),
 		`برنامه زمانی پرچم را با الگوی زیر بفرستید. برای پارامترهای روز(d)، ساعت(hh) و دقیقه(mm) باید مقداری تعیین شود اما پارامترهای دیگر می‌توانند خالی باشند. اگر به راهنمایی بیشتر نیاز دارید، /help را بفرستید
 y:
@@ -384,10 +362,8 @@ hh: 0
 mm: 30
 `,
 		nil,
-		chMessage,
 	)
 
-	result := <-chMessage
 	if result.Err != nil {
 		slog.Error(
 			"error send scheduler message to user",
@@ -399,27 +375,21 @@ mm: 30
 }
 
 func (h *HttpHandler) ResetUserStateAndSendResetMessage(chatId int) {
-	chFailed := make(chan entities.MethodResponse)
-	go h.api.SendMessage(
+	h.api.SendMessage(
 		fmt.Sprint(chatId),
 		"خطایی رخ داده است. لطفا دوباره /start را بفرستید",
 		nil,
-		chFailed,
 	)
 	h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.StartState}
 }
 
 func (h *HttpHandler) SendContactDeveloperErrorMessage(updateId, chatId int) {
-	chMessage := make(chan entities.MethodResponse)
-	replyMarkup := utils.GetMainReplyMarkup()
-	go h.api.SendMessage(
+	result := h.api.SendMessage(
 		fmt.Sprint(chatId),
 		"خطای نامشخص رخ داده است. این موضوع را با توسعه دهنده در میان بگذارید.",
-		replyMarkup,
-		chMessage,
+		utils.GetMainReplyMarkup(),
 	)
 
-	result := <-chMessage
 	if result.Err != nil {
 		slog.Error(
 			"unknown error occurred adding new feature flag",
@@ -454,15 +424,12 @@ func (h *HttpHandler) HandleSendCalendarType(
 	updateId, chatId int,
 	featureFlag *entities.FeatureFlag,
 ) {
-	ch := make(chan entities.MethodResponse)
 	replyMarkup := utils.GetScheduleReplyMarkup()
-	go h.api.SendMessage(
+	result := h.api.SendMessage(
 		fmt.Sprint(chatId),
 		"تقویم برنامه زمانی را انتخاب کنید",
 		replyMarkup,
-		ch,
 	)
-	result := <-ch
 	if result.Err != nil {
 		slog.Error(
 			"error send choose calendar message. err = ",
@@ -471,13 +438,13 @@ func (h *HttpHandler) HandleSendCalendarType(
 		)
 		h.ResetUserStateAndSendResetMessage(chatId)
 		return
-	} else {
-		h.userStates[fmt.Sprint(chatId)] = entities.UserState{
-			StateName: entities.ChooseCalendarTypeState,
-			Schedule: &entities.Schedule{
-				FeatureFlagName: featureFlag.Name,
-			},
-		}
+	}
+
+	h.userStates[fmt.Sprint(chatId)] = entities.UserState{
+		StateName: entities.ChooseCalendarTypeState,
+		Schedule: &entities.Schedule{
+			FeatureFlagName: featureFlag.Name,
+		},
 	}
 }
 
@@ -489,7 +456,7 @@ func (h *HttpHandler) HandleGetSchedule(
 	schedule, err := utils.ParseSchedulePattern(*text)
 
 	if err != nil {
-		go h.api.SendMessage(fmt.Sprint(chatId), err.Error(), nil, nil)
+		h.api.SendMessage(fmt.Sprint(chatId), err.Error(), nil)
 		return
 	}
 
@@ -513,10 +480,9 @@ func (h *HttpHandler) HandleGetSchedule(
 		)
 		return
 	}
-	go h.api.SendMessage(
+	h.api.SendMessage(
 		fmt.Sprint(chatId),
 		"مقدار(value) پرچم را وارد کنید. با اجرای برنامه زمانی، این مقدار برای کاربران تنظیم می شود.",
-		nil,
 		nil,
 	)
 }
@@ -536,13 +502,11 @@ func (h *HttpHandler) HandleGetValues(
 		}
 	}
 
-	ch := make(chan entities.MethodResponse)
 	replyMarkup := utils.GetUsersListCReplyMarkup()
-	go h.api.SendMessage(
+	h.api.SendMessage(
 		fmt.Sprint(chatId),
 		"شناسه‌ی کاربری(id) کاربرانی که می‌خواهید برای آنها این مقدار تنظیم شود را بنویسید. برای تنظیم مقدار برای همه‌ی کاربران، روی دکمه 'همه کاربران' کلیک کنید. ",
 		replyMarkup,
-		ch,
 	)
 }
 
@@ -565,14 +529,13 @@ func (h *HttpHandler) HandleUsersList(
 
 		h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.StartState}
 		replyMarkup := utils.GetMainReplyMarkup()
-		go h.api.SendMessage(
+		h.api.SendMessage(
 			fmt.Sprint(chatId),
 			fmt.Sprintf(
 				"برنامه زمانی با شناسه %d با موفقیت ذخیره شد",
 				scheduleId,
 			),
 			replyMarkup,
-			nil,
 		)
 
 		h.scheduler.OnNewSchedule(*schedule)
@@ -589,11 +552,10 @@ func (h *HttpHandler) HandleViewFeatureFlags(updateId, chatId int) {
 
 	if len(featureFlags) == 0 {
 		replyMarkup := utils.GetMainReplyMarkup()
-		go h.api.SendMessage(
+		h.api.SendMessage(
 			fmt.Sprint(chatId),
 			"شما هیچ پرچمی ثبت نکرده‌اید.",
 			replyMarkup,
-			nil,
 		)
 		return
 	}
@@ -604,16 +566,13 @@ func (h *HttpHandler) HandleViewFeatureFlags(updateId, chatId int) {
 		flagList.WriteString(fmt.Sprintf("%d. %s\n", i+1, flag.Name))
 	}
 
-	ch := make(chan entities.MethodResponse)
 	replyMarkup := utils.GetMainReplyMarkup()
-	go h.api.SendMessage(
+	result := h.api.SendMessage(
 		fmt.Sprint(chatId),
 		flagList.String(),
 		replyMarkup,
-		ch,
 	)
 
-	result := <-ch
 	if result.Err != nil {
 		slog.Error("error sending feature flags", slog.Any("error", result.Err))
 		h.ResetUserStateAndSendResetMessage(chatId)
@@ -631,27 +590,22 @@ func (h *HttpHandler) HandleDeleteFeatureFlagCallbackData(updateId, chatId int) 
 
 	if len(featureFlags) == 0 {
 		replyMarkup := utils.GetMainReplyMarkup()
-		go h.api.SendMessage(
+		h.api.SendMessage(
 			fmt.Sprint(chatId),
 			"پرچمی برای شما ثبت نشده است تا ان را پاک کنید.",
 			replyMarkup,
-			nil,
 		)
 		h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.StartState}
 		return
 	}
 
-	chMessage := make(chan entities.MethodResponse)
 	replyMarkup := utils.GetReplyMarkupFromFeatureFlags(featureFlags)
-
-	go h.api.SendMessage(
+	result := h.api.SendMessage(
 		fmt.Sprint(chatId),
 		"کدام پرچم را می‌خواهید حذف کنید؟",
 		replyMarkup,
-		chMessage,
 	)
 
-	result := <-chMessage
 	if result.Err != nil {
 		slog.Error(
 			"error sending select feature flag to delete. err = ",
@@ -661,9 +615,9 @@ func (h *HttpHandler) HandleDeleteFeatureFlagCallbackData(updateId, chatId int) 
 		)
 		h.ResetUserStateAndSendResetMessage(chatId)
 		return
-	} else {
-		h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.DeleteFeatureFlagState}
 	}
+
+	h.userStates[fmt.Sprint(chatId)] = entities.UserState{StateName: entities.DeleteFeatureFlagState}
 }
 
 func (h *HttpHandler) HandleDeleteFeatureFlag(
@@ -685,14 +639,11 @@ func (h *HttpHandler) HandleDeleteFeatureFlag(
 	}
 	replyMarkup := utils.GetMainReplyMarkup()
 
-	ch := make(chan entities.MethodResponse)
-	go h.api.SendMessage(
+	result := h.api.SendMessage(
 		fmt.Sprint(chatId),
 		fmt.Sprintf("پرچم %s پاک شد.", featureFlagName),
 		replyMarkup,
-		ch,
 	)
-	result := <-ch
 	if result.Err != nil {
 		slog.Error(
 			"error sending success delete feature flag. err = ",

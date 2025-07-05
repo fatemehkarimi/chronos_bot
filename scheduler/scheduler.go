@@ -1,11 +1,12 @@
 package scheduler
 
 import (
+	"log/slog"
+
 	"github.com/fatemehkarimi/chronos_bot/api"
 	"github.com/fatemehkarimi/chronos_bot/entities"
 	"github.com/fatemehkarimi/chronos_bot/pkg/utils"
 	"github.com/fatemehkarimi/chronos_bot/repository"
-	"log/slog"
 )
 
 type Scheduler interface {
@@ -76,12 +77,20 @@ func (s DBScheduler) ScheduleAndNotify(schedule entities.Schedule) {
 	}
 	task := func() error {
 		SetConfig(schedule)
-		s.api.SendMessage(
+		result := s.api.SendMessage(
 			s.logChannel,
 			utils.ScheduleToText(schedule),
 			nil,
-			nil,
 		)
+
+		if result.Err != nil {
+			slog.Error(
+				"error sending schedule to log channel",
+				slog.Any("error", result.Err),
+				slog.Any("schedule", schedule),
+			)
+		}
+
 		return nil
 	}
 	err := utils.ScheduleTaskOnSameDay(taskDayTime, task)

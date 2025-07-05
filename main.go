@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/fatemehkarimi/chronos_bot/handler"
-	"github.com/fatemehkarimi/chronos_bot/scheduler"
 	"log/slog"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/fatemehkarimi/chronos_bot/handler"
+	"github.com/fatemehkarimi/chronos_bot/scheduler"
 
 	"github.com/fatemehkarimi/chronos_bot/api"
 	"github.com/fatemehkarimi/chronos_bot/entities"
