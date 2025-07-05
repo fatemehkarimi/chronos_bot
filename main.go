@@ -94,6 +94,15 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/getUpdates", httpHandler.GetUpdates)
+	mux.HandleFunc(
+		"/healthcheck", func(w http.ResponseWriter, r *http.Request) {
+			_, err := w.Write([]byte("hello from chronos bot"))
+			if err != nil {
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		},
+	)
 
 	server := &http.Server{
 		Addr:         ":8080",
@@ -103,7 +112,7 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	go checkForUpdates(config.BotToken, httpHandler)
+	//go checkForUpdates(config.BotToken, httpHandler)
 	err = server.ListenAndServe()
 	if err != nil {
 		os.Exit(1)
