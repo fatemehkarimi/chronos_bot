@@ -10,6 +10,7 @@ RUN make
 
 FROM ubuntu:22.04 as run
 WORKDIR /app
+COPY --from=build /app/config.yaml ./config.yaml
 COPY --from=build /app/build/chronos_bot ./chronos_bot
 
 EXPOSE 8080
