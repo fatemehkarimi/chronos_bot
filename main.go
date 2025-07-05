@@ -153,6 +153,8 @@ func checkForUpdates(botToken string, handler handler.Handler) {
 				)
 				return
 			}
+			defer res.Body.Close()
+
 			slog.Info(
 				"getUpdates response from tapi",
 				slog.Int("status", res.StatusCode),
@@ -247,13 +249,19 @@ func LunchDailyScheduler(
 	startTime, endTime entities.CalendarTime,
 ) error {
 	go scheduler.LaunchSchedulesInRange(
+		entities.KhorshidiCalendar{},
+		startTime,
+		endTime,
+	)
+
+	go scheduler.LaunchSchedulesInRange(
 		entities.GeorgianCalendar{},
 		startTime,
 		endTime,
 	)
 
 	go scheduler.LaunchSchedulesInRange(
-		entities.KhorshidiCalendar{},
+		entities.QamariCalendar{},
 		startTime,
 		endTime,
 	)

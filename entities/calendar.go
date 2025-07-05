@@ -1,8 +1,13 @@
 package entities
 
 import (
-	ptime "github.com/yaa110/go-persian-calendar"
+	"encoding/json"
+	"io"
+	"net/http"
+	"strconv"
 	"time"
+
+	ptime "github.com/yaa110/go-persian-calendar"
 )
 
 type Calendar interface {
@@ -51,5 +56,26 @@ func (q QamariCalendar) Type() CalendarType {
 }
 
 func (q QamariCalendar) GetToday() CalendarTime {
-	panic("not implemented yet")
+	res, err := http.Get("https://api.aladhan.com/v1/gToH")
+	if err != nil {
+		return CalendarTime{}
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return CalendarTime{}
+	}
+
+	var cTime CalendarTime
+	var resp AladhanDateResponse
+	err = json.Unmarshal(body, &resp)
+
+	if err != nil {
+		return cTime
+	}
+	cTime.Year, _ = strconv.Atoi(resp.Data.Hijri.Year)
+	cTime.Month = resp.Data.Hijri.Month.Number
+	cTime.Day, _ = strconv.Atoi(resp.Data.Hijri.Day)
+	return cTime
 }
