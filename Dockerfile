@@ -9,6 +9,9 @@ COPY . .
 RUN make
 
 FROM ubuntu:22.04 as run
+# Install CA certificates to fix SSL certificate verification
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY --from=build /app/config.yaml ./config.yaml
 COPY --from=build /app/build/chronos_bot ./chronos_bot
