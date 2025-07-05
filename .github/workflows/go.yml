@@ -6,6 +6,7 @@ name: Go
 on:
   push:
     branches: [ "master" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "master" ]
 
@@ -15,14 +16,52 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for git describe
 
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
         go-version: '1.24.3'
 
+    - name: Generate version
+      id: version
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          # Tagged release - use the tag as version
+          VERSION=${GITHUB_REF#refs/tags/}
+        else
+          # Non-tagged - use git describe or fallback to commit
+          if git describe --tags --exact-match HEAD 2>/dev/null; then
+            VERSION=$(git describe --tags --exact-match HEAD)
+          elif git describe --tags 2>/dev/null; then
+            VERSION=$(git describe --tags --always --dirty)
+          else
+            VERSION="v0.0.0-$(git rev-parse --short HEAD)"
+          fi
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+
     - name: Build
       run: make
+
+    - name: Build Docker Image
+      run: |
+        docker build -t ghcr.io/fatemehkarimi/chronos_bot:${{ steps.version.outputs.version }} .
+        docker build -t ghcr.io/fatemehkarimi/chronos_bot:latest .
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Push Docker Image
+      run: |
+        docker push ghcr.io/fatemehkarimi/chronos_bot:${{ steps.version.outputs.version }}
+        docker push ghcr.io/fatemehkarimi/chronos_bot:latest
 
     - name: Test
       run: go test -v ./...
