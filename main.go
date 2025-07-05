@@ -103,7 +103,7 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	go checkForUpdates(config.BotToken, httpHandler)
+	//go checkForUpdates(config.BotToken, httpHandler)
 	err = server.ListenAndServe()
 	if err != nil {
 		os.Exit(1)
