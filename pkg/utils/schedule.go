@@ -114,8 +114,8 @@ func ShouldRunToday(
 	year := now.Year
 	month := now.Month
 	day := now.Day
-	hour := now.Hour
-	minute := now.Minute
+	hour := time.Now().Hour()
+	minute := time.Now().Hour()
 
 	return day == schedule.Calendar.Day &&
 		(schedule.Calendar.Month == 0 || schedule.Calendar.Month == month) &&
