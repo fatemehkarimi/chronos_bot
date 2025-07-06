@@ -41,6 +41,7 @@ func LoadConfig() (Config, error) {
 }
 
 func main() {
+	fmt.Println("here time = ", time.Now())
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 	config, err := LoadConfig()
 	if err != nil {
