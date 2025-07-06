@@ -9,8 +9,14 @@ COPY . .
 RUN make
 
 FROM ubuntu:22.04 as run
-# Install CA certificates to fix SSL certificate verification
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+# Install CA certificates only
+RUN apt-get update && \
+ apt-get install -y ca-certificates tzdata && \
+ rm -rf /var/lib/apt/lists/*
+
+# Set timezone to Asia/Tehran
+ENV TZ=Asia/Tehran
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 WORKDIR /app
 COPY --from=build /app/config.yaml ./config.yaml

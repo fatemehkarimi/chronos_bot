@@ -2,11 +2,12 @@ package utils
 
 import (
 	"fmt"
-	"github.com/fatemehkarimi/chronos_bot/entities"
 	"log/slog"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/fatemehkarimi/chronos_bot/entities"
 )
 
 func ParseSchedulePattern(pattern string) (*entities.Schedule, error) {
@@ -115,7 +116,7 @@ func ShouldRunToday(
 	month := now.Month
 	day := now.Day
 	hour := time.Now().Hour()
-	minute := time.Now().Hour()
+	minute := time.Now().Minute()
 
 	return day == schedule.Calendar.Day &&
 		(schedule.Calendar.Month == 0 || schedule.Calendar.Month == month) &&
