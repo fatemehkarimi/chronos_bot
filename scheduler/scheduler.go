@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"fmt"
 	"log/slog"
 
 	"github.com/fatemehkarimi/chronos_bot/api"
@@ -65,6 +66,7 @@ func (s DBScheduler) LaunchSchedulesInRange(
 
 func (s DBScheduler) OnNewSchedule(schedule entities.Schedule) {
 	calendar := utils.GetCalendarByType(schedule.Calendar.Type)
+	fmt.Println("here on new schedule = ", utils.ShouldRunToday(calendar, schedule))
 	if utils.ShouldRunToday(calendar, schedule) {
 		go s.ScheduleAndNotify(schedule)
 	}
